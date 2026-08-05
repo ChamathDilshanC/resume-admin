@@ -2,6 +2,7 @@
 
 import { Field, TextArea, Card, Button } from "@/components/FormControls";
 import type { ResumeBasics } from "@/lib/types";
+import { PhotoUploader } from "./PhotoUploader";
 
 export function BasicsSection({
   basics,
@@ -17,18 +18,17 @@ export function BasicsSection({
   return (
     <Card>
       <h2 className="mb-3 text-lg font-bold text-gray-900">Basics</h2>
+
+      <div className="mb-4">
+        <PhotoUploader image={basics.image} onChange={(v) => set("image", v)} />
+      </div>
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Name" value={basics.name} onChange={(v) => set("name", v)} />
         <Field label="Label / Title" value={basics.label} onChange={(v) => set("label", v)} />
         <Field label="Email" value={basics.email} onChange={(v) => set("email", v)} />
         <Field label="Phone" value={basics.phone} onChange={(v) => set("phone", v)} />
         <Field label="Portfolio URL" value={basics.url} onChange={(v) => set("url", v)} />
-        <Field
-          label="Photo URL / path"
-          value={basics.image}
-          onChange={(v) => set("image", v)}
-          placeholder="https://... or a data URI"
-        />
         <Field
           label="City"
           value={basics.location.city}
