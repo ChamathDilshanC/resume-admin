@@ -112,8 +112,8 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
           </Button>
         </header>
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6">
-          <div className="mx-auto max-w-4xl">
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="w-full">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}

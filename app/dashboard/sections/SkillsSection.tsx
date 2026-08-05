@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, Card, Button } from "@/components/FormControls";
+import { Field, Button, EntityCard, SectionHeader } from "@/components/FormControls";
+import { SparkleIcon } from "@/components/icons";
 import type { SkillItem } from "@/lib/types";
 
 const EMPTY_SKILL: SkillItem = { name: "", level: "", keywords: [] };
@@ -19,32 +20,39 @@ export function SkillsSection({
   }
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Skills</h2>
-        <Button variant="secondary" onClick={() => onChange([...items, { ...EMPTY_SKILL }])}>
-          + Add skill group
-        </Button>
-      </div>
-      <div className="space-y-3">
+    <div>
+      <SectionHeader
+        icon={SparkleIcon}
+        color="amber"
+        title="Skills"
+        action={
+          <Button variant="secondary" onClick={() => onChange([...items, { ...EMPTY_SKILL }])}>
+            + Add skill group
+          </Button>
+        }
+      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {items.map((item, i) => (
-          <div key={i} className="grid grid-cols-1 gap-2 rounded-md border border-gray-200 p-3 sm:grid-cols-[1fr,3fr,auto]">
-            <Field label="Category" value={item.name} onChange={(v) => update(i, { name: v })} />
-            <Field
-              label="Keywords (comma-separated)"
-              value={item.keywords.join(", ")}
-              onChange={(v) =>
-                update(i, { keywords: v.split(",").map((s) => s.trim()).filter(Boolean) })
-              }
-            />
-            <div className="flex items-end">
-              <Button variant="danger" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
-                Remove
-              </Button>
+          <EntityCard
+            key={i}
+            icon={SparkleIcon}
+            color="amber"
+            title={item.name || "New category"}
+            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
+          >
+            <div className="space-y-3">
+              <Field label="Category" value={item.name} onChange={(v) => update(i, { name: v })} />
+              <Field
+                label="Keywords (comma-separated)"
+                value={item.keywords.join(", ")}
+                onChange={(v) =>
+                  update(i, { keywords: v.split(",").map((s) => s.trim()).filter(Boolean) })
+                }
+              />
             </div>
-          </div>
+          </EntityCard>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }

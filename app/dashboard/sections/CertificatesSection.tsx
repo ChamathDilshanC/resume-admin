@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, Card, Button } from "@/components/FormControls";
+import { Field, Button, EntityCard, SectionHeader } from "@/components/FormControls";
+import { BadgeCheckIcon } from "@/components/icons";
 import type { CertificateItem } from "@/lib/types";
 
 const EMPTY_CERTIFICATE: CertificateItem = { name: "", date: "", issuer: "", url: "" };
@@ -19,30 +20,35 @@ export function CertificatesSection({
   }
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Certificates</h2>
-        <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_CERTIFICATE }, ...items])}>
-          + Add certificate
-        </Button>
-      </div>
-      <div className="space-y-3">
+    <div>
+      <SectionHeader
+        icon={BadgeCheckIcon}
+        color="rose"
+        title="Certificates"
+        action={
+          <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_CERTIFICATE }, ...items])}>
+            + Add certificate
+          </Button>
+        }
+      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {items.map((item, i) => (
-          <div key={i} className="rounded-md border border-gray-200 p-3">
+          <EntityCard
+            key={i}
+            icon={BadgeCheckIcon}
+            color="rose"
+            title={item.name || "New certificate"}
+            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Name" value={item.name} onChange={(v) => update(i, { name: v })} />
               <Field label="Issuer" value={item.issuer} onChange={(v) => update(i, { issuer: v })} />
               <Field label="Date" value={item.date} onChange={(v) => update(i, { date: v })} />
               <Field label="URL" value={item.url} onChange={(v) => update(i, { url: v })} />
             </div>
-            <div className="mt-3">
-              <Button variant="danger" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
-                Remove
-              </Button>
-            </div>
-          </div>
+          </EntityCard>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }

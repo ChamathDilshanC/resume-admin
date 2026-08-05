@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, StringListEditor, Card, Button } from "@/components/FormControls";
+import { Field, StringListEditor, Button, IconButton, EntityCard, SectionHeader } from "@/components/FormControls";
+import { FolderIcon, TrashIcon, PlusIcon } from "@/components/icons";
 import type { ProjectItem } from "@/lib/types";
 
 const EMPTY_PROJECT: ProjectItem = { name: "", description: "", highlights: [], links: [] };
@@ -19,16 +20,26 @@ export function ProjectsSection({
   }
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Projects</h2>
-        <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_PROJECT }, ...items])}>
-          + Add project
-        </Button>
-      </div>
-      <div className="space-y-4">
+    <div>
+      <SectionHeader
+        icon={FolderIcon}
+        color="teal"
+        title="Projects"
+        action={
+          <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_PROJECT }, ...items])}>
+            + Add project
+          </Button>
+        }
+      />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {items.map((item, i) => (
-          <div key={i} className="rounded-md border border-gray-200 p-3">
+          <EntityCard
+            key={i}
+            icon={FolderIcon}
+            color="teal"
+            title={item.name || "New project"}
+            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Name" value={item.name} onChange={(v) => update(i, { name: v })} />
               <Field
@@ -39,45 +50,46 @@ export function ProjectsSection({
             </div>
 
             <div className="mt-3">
-              <span className="mb-1 block text-sm font-medium text-gray-700">Links</span>
+              <span className="mb-1.5 block text-sm font-medium text-gray-600">Links</span>
               <div className="space-y-2">
                 {item.links.map((link, li) => (
-                  <div key={li} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr,2fr,auto]">
-                    <Field
-                      label="Label"
-                      value={link.label}
-                      onChange={(v) => {
-                        const next = [...item.links];
-                        next[li] = { ...next[li], label: v };
-                        update(i, { links: next });
-                      }}
-                    />
-                    <Field
-                      label="URL"
-                      value={link.url}
-                      onChange={(v) => {
-                        const next = [...item.links];
-                        next[li] = { ...next[li], url: v };
-                        update(i, { links: next });
-                      }}
-                    />
-                    <div className="flex items-end">
-                      <Button
-                        variant="danger"
-                        onClick={() => update(i, { links: item.links.filter((_, idx) => idx !== li) })}
-                      >
-                        Remove
-                      </Button>
+                  <div key={li} className="flex items-end gap-2">
+                    <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2">
+                      <Field
+                        label="Label"
+                        value={link.label}
+                        onChange={(v) => {
+                          const next = [...item.links];
+                          next[li] = { ...next[li], label: v };
+                          update(i, { links: next });
+                        }}
+                      />
+                      <Field
+                        label="URL"
+                        value={link.url}
+                        onChange={(v) => {
+                          const next = [...item.links];
+                          next[li] = { ...next[li], url: v };
+                          update(i, { links: next });
+                        }}
+                      />
                     </div>
+                    <IconButton
+                      variant="danger"
+                      onClick={() => update(i, { links: item.links.filter((_, idx) => idx !== li) })}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </IconButton>
                   </div>
                 ))}
               </div>
-              <Button
-                variant="secondary"
+              <button
+                type="button"
                 onClick={() => update(i, { links: [...item.links, { label: "", url: "" }] })}
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-blue-700"
               >
-                + Add link
-              </Button>
+                <PlusIcon className="h-3.5 w-3.5" /> Add link
+              </button>
             </div>
 
             <div className="mt-3">
@@ -87,14 +99,9 @@ export function ProjectsSection({
                 onChange={(v) => update(i, { highlights: v })}
               />
             </div>
-            <div className="mt-3">
-              <Button variant="danger" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
-                Remove this project
-              </Button>
-            </div>
-          </div>
+          </EntityCard>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }

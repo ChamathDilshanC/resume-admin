@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, Card, Button } from "@/components/FormControls";
+import { Field, Button, EntityCard, SectionHeader } from "@/components/FormControls";
+import { AcademicCapIcon } from "@/components/icons";
 import type { EducationItem } from "@/lib/types";
 
 const EMPTY_EDUCATION: EducationItem = {
@@ -28,16 +29,26 @@ export function EducationSection({
   }
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Education</h2>
-        <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_EDUCATION }, ...items])}>
-          + Add education
-        </Button>
-      </div>
-      <div className="space-y-3">
+    <div>
+      <SectionHeader
+        icon={AcademicCapIcon}
+        color="sky"
+        title="Education"
+        action={
+          <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_EDUCATION }, ...items])}>
+            + Add education
+          </Button>
+        }
+      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {items.map((item, i) => (
-          <div key={i} className="rounded-md border border-gray-200 p-3">
+          <EntityCard
+            key={i}
+            icon={AcademicCapIcon}
+            color="sky"
+            title={item.institution || "New institution"}
+            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
                 label="Institution"
@@ -49,14 +60,9 @@ export function EducationSection({
               <Field label="Start Date" value={item.startDate} onChange={(v) => update(i, { startDate: v })} />
               <Field label="End Date" value={item.endDate} onChange={(v) => update(i, { endDate: v })} />
             </div>
-            <div className="mt-3">
-              <Button variant="danger" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
-                Remove
-              </Button>
-            </div>
-          </div>
+          </EntityCard>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }

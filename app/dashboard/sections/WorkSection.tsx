@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, StringListEditor, Card, Button } from "@/components/FormControls";
+import { Field, StringListEditor, Button, EntityCard, SectionHeader } from "@/components/FormControls";
+import { BriefcaseIcon } from "@/components/icons";
 import type { WorkItem } from "@/lib/types";
 
 const EMPTY_WORK: WorkItem = {
@@ -27,16 +28,26 @@ export function WorkSection({
   }
 
   return (
-    <Card>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Work Experience</h2>
-        <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_WORK }, ...items])}>
-          + Add work item
-        </Button>
-      </div>
-      <div className="space-y-4">
+    <div>
+      <SectionHeader
+        icon={BriefcaseIcon}
+        color="violet"
+        title="Work Experience"
+        action={
+          <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_WORK }, ...items])}>
+            + Add work item
+          </Button>
+        }
+      />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {items.map((item, i) => (
-          <div key={i} className="rounded-md border border-gray-200 p-3">
+          <EntityCard
+            key={i}
+            icon={BriefcaseIcon}
+            color="violet"
+            title={item.position || "New position"}
+            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
+          >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Position" value={item.position} onChange={(v) => update(i, { position: v })} />
               <Field label="Company" value={item.name} onChange={(v) => update(i, { name: v })} />
@@ -51,14 +62,9 @@ export function WorkSection({
                 onChange={(v) => update(i, { highlights: v })}
               />
             </div>
-            <div className="mt-3">
-              <Button variant="danger" onClick={() => onChange(items.filter((_, idx) => idx !== i))}>
-                Remove this work item
-              </Button>
-            </div>
-          </div>
+          </EntityCard>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }
