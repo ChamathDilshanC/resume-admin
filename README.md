@@ -1,16 +1,62 @@
-# resume-admin
+<div align="center">
+
+<img src="public/logo-wordmark.png" alt="DevResume" width="320" />
+
+### A private, single-login dashboard for editing `resume.json` — no git commands required.
+
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-blocks.so-000000?style=flat-square)
+![NextAuth](https://img.shields.io/badge/NextAuth-GitHub_OAuth-24292F?style=flat-square&logo=github&logoColor=white)
+![Framer Motion](https://img.shields.io/badge/Framer_Motion-animations-0055FF?style=flat-square&logo=framer&logoColor=white)
+
+</div>
+
+---
 
 A private, single-user editor for `resume.json` in the [resume-core](https://github.com/ChamathDilshanC/resume-core)
 repository. Sign in with GitHub (locked to a single account), edit any section
-of the resume, and save — it commits `resume.json` straight to `resume-core`
-and triggers the existing Puppeteer pipeline to regenerate `resume.pdf`.
+of the resume in a full-width card dashboard, and save — it commits `resume.json`
+straight to `resume-core` and triggers the existing Puppeteer pipeline to
+regenerate `resume.pdf`.
 
 No database, no separate backend: reads/writes go directly through the GitHub
 API using your own OAuth session, and PDF rendering reuses the
 `generate-pdf.js` script and `regenerate-pdf.yml` workflow already in
 `resume-core`.
 
+## Interface
+
+- **Sidebar navigation** (shadcn `sidebar-01` block) with a live command
+  palette (`⌘K`) search, per-section item counts, and the signed-in GitHub
+  account in the footer
+- **Responsive card grid** for every section — Work Experience and Projects
+  as 2-column cards, Skills/Education/Certificates/References up to 3 columns
+  — instead of one long stacked form
+- **Drag-and-drop photo upload** straight to `resume-core/assets/`, with a
+  live preview proxied through a private, authenticated API route
+- **Toast notifications** ([`goey-toast`](https://goey-toast.vercel.app)) on
+  save success/failure
+
 ## How it works
+
+```mermaid
+flowchart LR
+    U(["You"]) -->|Sign in with GitHub| A["NextAuth<br/>signIn callback"]
+    A -->|"login === ALLOWED_GITHUB_USERNAME?"| D{Allowed?}
+    D -->|no| R["Rejected"]
+    D -->|yes| DASH["/dashboard<br/>fetches resume.json via Octokit"]
+    DASH --> EDIT["Edit in React state<br/>(nothing written yet)"]
+    EDIT -->|Save| ACT["Server Action"]
+    ACT -->|"PUT contents/resume.json"| CORE[("resume-core repo")]
+    ACT -->|"workflow_dispatch"| WF["regenerate-pdf.yml"]
+    WF --> PDF(["resume.pdf updated"])
+
+    style D fill:#fef9c3,stroke:#ca8a04,color:#111827
+    style R fill:#fee2e2,stroke:#dc2626,color:#111827
+    style PDF fill:#dcfce7,stroke:#16a34a,color:#111827
+```
 
 1. Sign in with GitHub. The `signIn` callback in `lib/auth.ts` only allows the
    account named in `ALLOWED_GITHUB_USERNAME` — everyone else is rejected.
@@ -77,3 +123,6 @@ environment variables from step 2 in the Vercel project settings (with
   changes are always attributable to that account.
 - The OAuth token lives only in the encrypted, httpOnly session cookie — it
   is never exposed to client-side JavaScript.
+- `/api/asset` proxies private repo images (like the profile photo) through
+  an authenticated server route so `<img>` tags never need a public URL or a
+  client-exposed token.
