@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { Button, Field } from "@/components/FormControls";
 import { uploadPhoto } from "../actions";
 
@@ -40,16 +41,20 @@ export function PhotoUploader({
 
   return (
     <div className="text-sm">
-      <span className="mb-1 block font-medium text-gray-700">Photo</span>
+      <span className="mb-1.5 block font-medium text-gray-600">Photo</span>
       <div className="flex items-center gap-4">
-        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50">
+        <motion.div
+          whileHover={{ scale: 1.04 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 shadow-sm"
+        >
           {previewSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewSrc} alt="Profile" className="h-full w-full object-cover" />
           ) : (
             <span className="text-xs text-gray-400">No photo</span>
           )}
-        </div>
+        </motion.div>
         <div className="flex-1 space-y-2">
           <input
             ref={fileInputRef}
@@ -65,6 +70,7 @@ export function PhotoUploader({
           <Button
             variant="secondary"
             onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
           >
             {isUploading ? "Uploading..." : "Upload new photo"}
           </Button>
