@@ -22,7 +22,7 @@ export function Field({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/15"
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-brand focus:ring-2 focus:ring-brand/15"
       />
     </label>
   );
@@ -46,7 +46,7 @@ export function TextArea({
         value={value}
         rows={rows}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-accent focus:ring-2 focus:ring-accent/15"
+        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-brand focus:ring-2 focus:ring-brand/15"
       />
     </label>
   );
@@ -80,7 +80,7 @@ export function StringListEditor({
                 next[i] = e.target.value;
                 onChange(next);
               }}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 focus:border-accent focus:ring-2 focus:ring-accent/15"
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 focus:border-brand focus:ring-2 focus:ring-brand/15"
             />
             <IconButton onClick={() => onChange(items.filter((_, idx) => idx !== i))} variant="danger">
               <TrashIcon className="h-4 w-4" />
@@ -91,7 +91,7 @@ export function StringListEditor({
       <button
         type="button"
         onClick={() => onChange([...items, ""])}
-        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-accent transition-colors hover:text-blue-700"
+        className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand transition-colors hover:text-blue-700"
       >
         <PlusIcon className="h-3.5 w-3.5" /> Add item
       </button>
@@ -100,7 +100,7 @@ export function StringListEditor({
 }
 
 const BUTTON_STYLES = {
-  primary: "bg-accent text-white shadow-sm shadow-accent/25 hover:bg-blue-700",
+  primary: "bg-brand text-white shadow-sm shadow-brand/25 hover:bg-blue-700",
   secondary: "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300",
   danger: "bg-white border border-red-200 text-red-600 hover:bg-red-50",
 };

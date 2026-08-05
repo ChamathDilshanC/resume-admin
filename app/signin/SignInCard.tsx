@@ -11,7 +11,7 @@ export function SignInCard() {
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_rgba(16,24,40,0.06)]"
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-base font-bold text-white">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand text-base font-bold text-white">
         R
       </div>
       <div>
