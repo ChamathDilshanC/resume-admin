@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useEffect } from "react";
+import { Search } from "lucide-react";
 import {
   Command,
   CommandDialog,
@@ -36,19 +37,21 @@ export function NavHeader({
 
   return (
     <>
-      <SidebarHeader>
-        <div
-          className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2.5 hover:bg-sidebar-accent"
+      <SidebarHeader className="gap-3 px-2 pt-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-wordmark.png" alt="DevResume" className="h-6 w-auto object-contain px-1" />
+
+        <button
+          type="button"
           onClick={() => setOpen(true)}
+          className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-2 text-left transition-colors hover:bg-sidebar-accent"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-xs font-bold text-white">
-            R
-          </div>
-          <span className="flex-1 text-sm font-bold text-sidebar-foreground">Resume Admin</span>
-          <kbd className="rounded border border-sidebar-border px-1.5 py-0.5 font-[inherit] text-[10px] text-muted-foreground">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="flex-1 text-sm text-muted-foreground">Search...</span>
+          <kbd className="rounded border border-sidebar-border bg-sidebar px-1.5 py-0.5 font-[inherit] text-[10px] text-muted-foreground">
             ⌘K
           </kbd>
-        </div>
+        </button>
       </SidebarHeader>
 
       <CommandDialog onOpenChange={setOpen} open={open}>
