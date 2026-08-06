@@ -5,6 +5,14 @@ import { UserIcon, TrashIcon, PlusIcon } from "@/components/icons";
 import type { ResumeBasics } from "@/lib/types";
 import { PhotoUploader } from "./PhotoUploader";
 
+function CardLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mb-4 block text-xs font-semibold tracking-wide text-gray-400 uppercase">
+      {children}
+    </span>
+  );
+}
+
 export function BasicsSection({
   basics,
   onChange,
@@ -20,34 +28,46 @@ export function BasicsSection({
     <div>
       <SectionHeader icon={UserIcon} color="slate" title="Basics" />
 
-      <Card>
-        <div className="mb-5">
-          <PhotoUploader image={basics.image} onChange={(v) => set("image", v)} />
-        </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <Card>
+          <CardLabel>Identity</CardLabel>
+          <div className="mb-4">
+            <PhotoUploader image={basics.image} onChange={(v) => set("image", v)} />
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Name" value={basics.name} onChange={(v) => set("name", v)} />
+            <Field label="Label / Title" value={basics.label} onChange={(v) => set("label", v)} />
+          </div>
+        </Card>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <Field label="Name" value={basics.name} onChange={(v) => set("name", v)} />
-          <Field label="Label / Title" value={basics.label} onChange={(v) => set("label", v)} />
-          <Field label="Email" value={basics.email} onChange={(v) => set("email", v)} />
-          <Field label="Phone" value={basics.phone} onChange={(v) => set("phone", v)} />
-          <Field label="Portfolio URL" value={basics.url} onChange={(v) => set("url", v)} />
-          <Field
-            label="City"
-            value={basics.location.city}
-            onChange={(v) => set("location", { ...basics.location, city: v })}
-          />
-          <Field
-            label="Country code"
-            value={basics.location.countryCode}
-            onChange={(v) => set("location", { ...basics.location, countryCode: v })}
-          />
-        </div>
-        <div className="mt-3">
-          <TextArea label="Summary" value={basics.summary} onChange={(v) => set("summary", v)} rows={4} />
-        </div>
-      </Card>
+        <Card>
+          <CardLabel>Contact</CardLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Email" value={basics.email} onChange={(v) => set("email", v)} />
+            <Field label="Phone" value={basics.phone} onChange={(v) => set("phone", v)} />
+            <Field label="Portfolio URL" value={basics.url} onChange={(v) => set("url", v)} />
+            <Field
+              label="City"
+              value={basics.location.city}
+              onChange={(v) => set("location", { ...basics.location, city: v })}
+            />
+            <Field
+              label="Country code"
+              value={basics.location.countryCode}
+              onChange={(v) => set("location", { ...basics.location, countryCode: v })}
+            />
+          </div>
+        </Card>
+      </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4">
+        <Card>
+          <CardLabel>Summary</CardLabel>
+          <TextArea label="" value={basics.summary} onChange={(v) => set("summary", v)} rows={4} />
+        </Card>
+      </div>
+
+      <div className="mt-6 flex items-center justify-between">
         <span className="text-sm font-semibold text-gray-700">Profiles</span>
         <Button
           variant="secondary"

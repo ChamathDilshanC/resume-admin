@@ -6,8 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarFooter, SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
@@ -40,7 +42,10 @@ export function NavFooter() {
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-              <DropdownMenuLabel>Signed in as {user?.name}</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Signed in as {user?.name}</DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/signin" })}>
                 <LogOut aria-hidden="true" className="opacity-80" size={16} />
                 Sign out

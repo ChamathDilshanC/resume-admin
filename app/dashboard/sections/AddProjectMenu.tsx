@@ -101,20 +101,20 @@ export function AddProjectMenu({
       </DropdownMenu>
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[88vh] w-[66vw] max-w-[66vw] flex-col overflow-hidden sm:max-w-[66vw]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>
               {step === "review" ? "Review generated project" : "Import from GitHub"}
             </DialogTitle>
           </DialogHeader>
 
           {step === "picker" && (
-            <div className="mt-2">
+            <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
               <Field label="Search your repos" value={query} onChange={setQuery} placeholder="Type to filter..." />
               {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-              <div className="mt-3 max-h-80 space-y-1 overflow-y-auto">
+              <div className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
                 {loadingRepos && (
-                  <p className="py-6 text-center text-sm text-gray-400">Loading your repos...</p>
+                  <p className="col-span-2 py-6 text-center text-sm text-gray-400">Loading your repos...</p>
                 )}
                 {!loadingRepos &&
                   filteredRepos.map((repo) => (
@@ -138,14 +138,14 @@ export function AddProjectMenu({
                     </button>
                   ))}
                 {!loadingRepos && filteredRepos.length === 0 && (
-                  <p className="py-6 text-center text-sm text-gray-400">No repos match.</p>
+                  <p className="col-span-2 py-6 text-center text-sm text-gray-400">No repos match.</p>
                 )}
               </div>
             </div>
           )}
 
           {step === "generating" && (
-            <div className="flex flex-col items-center gap-3 py-10">
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10">
               <motion.span
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
@@ -158,13 +158,15 @@ export function AddProjectMenu({
           )}
 
           {step === "review" && draft && (
-            <div className="mt-2 space-y-3">
-              <Field label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
-              <Field
-                label="Description"
-                value={draft.description}
-                onChange={(v) => setDraft({ ...draft, description: v })}
-              />
+            <div className="mt-2 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
+                <Field
+                  label="Description"
+                  value={draft.description}
+                  onChange={(v) => setDraft({ ...draft, description: v })}
+                />
+              </div>
               <StringListEditor
                 label="Highlights (AI-generated — edit freely)"
                 items={draft.highlights}
