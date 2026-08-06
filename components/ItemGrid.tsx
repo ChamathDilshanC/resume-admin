@@ -173,13 +173,15 @@ export function ItemGrid<T>({
       )}
 
       <Dialog open={openIndex !== null} onOpenChange={(open) => !open && setOpenIndex(null)}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="flex max-h-[88vh] w-[66vw] max-w-[66vw] flex-col overflow-hidden sm:max-w-[66vw]">
           {openItem !== null && openIndex !== null && (
             <>
-              <DialogHeader>
+              <DialogHeader className="shrink-0">
                 <DialogTitle>{getTitle(openItem) || "Untitled"}</DialogTitle>
               </DialogHeader>
-              <div className="mt-2">{renderDetail(openItem, openIndex)}</div>
+              <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
+                {renderDetail(openItem, openIndex)}
+              </div>
             </>
           )}
         </DialogContent>

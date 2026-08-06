@@ -53,6 +53,12 @@ export function TextArea({
   );
 }
 
+function autoGrow(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 export function StringListEditor({
   label,
   items,
@@ -76,12 +82,14 @@ export function StringListEditor({
             <textarea
               value={item}
               rows={2}
+              ref={autoGrow}
               onChange={(e) => {
+                autoGrow(e.target);
                 const next = [...items];
                 next[i] = e.target.value;
                 onChange(next);
               }}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 focus:border-brand focus:ring-2 focus:ring-brand/15"
+              className="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 focus:border-brand focus:ring-2 focus:ring-brand/15"
             />
             <IconButton onClick={() => onChange(items.filter((_, idx) => idx !== i))} variant="danger">
               <TrashIcon className="h-4 w-4" />
