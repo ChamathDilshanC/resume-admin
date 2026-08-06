@@ -39,6 +39,31 @@ API using your own OAuth session, and PDF rendering reuses the
 - **Toast notifications** ([`goey-toast`](https://goey-toast.vercel.app)) on
   save success/failure
 
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src=".github/screenshots/signin.png" alt="Sign in" /><br/><sub><b>Sign in</b> — single-account GitHub OAuth gate</sub></td>
+<td width="50%"><img src=".github/screenshots/basics.png" alt="Basics tab" /><br/><sub><b>Basics</b> — Identity / Contact / Summary cards</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src=".github/screenshots/work-experience.png" alt="Work experience tab" /><br/><sub><b>Work Experience</b> — card grid with grid/list toggle</sub></td>
+<td width="50%"><img src=".github/screenshots/projects.png" alt="Projects tab" /><br/><sub><b>Projects</b> — 13 tracked projects, click any card for full detail</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src=".github/screenshots/import-from-github.png" alt="Import from GitHub dialog" /><br/><sub><b>Add project → Import from GitHub</b> — pick a repo, AI drafts the bullets</sub></td>
+<td width="50%"><img src=".github/screenshots/skills.png" alt="Skills tab" /><br/><sub><b>Skills</b> — grouped skill cards</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src=".github/screenshots/education.png" alt="Education tab" /><br/><sub><b>Education</b></sub></td>
+<td width="50%"><img src=".github/screenshots/certificates.png" alt="Certificates tab" /><br/><sub><b>Certificates</b></sub></td>
+</tr>
+<tr>
+<td width="50%"><img src=".github/screenshots/references.png" alt="References tab" /><br/><sub><b>References</b></sub></td>
+<td width="50%"></td>
+</tr>
+</table>
+
 ## How it works
 
 ```mermaid
