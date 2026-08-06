@@ -5,6 +5,7 @@ import { ItemGrid } from "@/components/ItemGrid";
 import { FolderIcon, TrashIcon, PlusIcon } from "@/components/icons";
 import type { ProjectItem } from "@/lib/types";
 import { AddProjectMenu } from "./AddProjectMenu";
+import { ProjectPriorityModal } from "./ProjectPriorityModal";
 
 const EMPTY_PROJECT: ProjectItem = { name: "", description: "", highlights: [], links: [] };
 
@@ -28,10 +29,13 @@ export function ProjectsSection({
         color="teal"
         title="Projects"
         action={
-          <AddProjectMenu
-            onAddBlank={() => onChange([{ ...EMPTY_PROJECT }, ...items])}
-            onAddGenerated={(project) => onChange([project, ...items])}
-          />
+          <div className="flex items-center gap-2">
+            <ProjectPriorityModal items={items} onSave={onChange} />
+            <AddProjectMenu
+              onAddBlank={() => onChange([{ ...EMPTY_PROJECT }, ...items])}
+              onAddGenerated={(project) => onChange([project, ...items])}
+            />
+          </div>
         }
       />
       <ItemGrid
