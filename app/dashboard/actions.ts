@@ -8,8 +8,12 @@ import {
   triggerPdfRegeneration,
   uploadAsset,
   extensionOf,
+  listUserRepos,
+  fetchProjectTechStack,
+  type RepoSummary,
 } from "@/lib/github";
-import type { ResumeData } from "@/lib/types";
+import { generateProjectHighlights } from "@/lib/ai";
+import type { ResumeData, ProjectItem } from "@/lib/types";
 
 interface SessionWithToken {
   accessToken?: string;
@@ -63,6 +67,56 @@ export async function uploadPhoto(
     const assetPath = `assets/profile${ext}`;
     await uploadAsset(accessToken, assetPath, buffer, "chore: update profile photo via resume-admin");
     return { ok: true, path: assetPath };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function listGithubRepos(): Promise<
+  { ok: true; repos: RepoSummary[] } | { ok: false; error: string }
+> {
+  try {
+    const accessToken = await requireAccessToken();
+    const repos = await listUserRepos(accessToken);
+    return { ok: true, repos };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function generateProjectFromGithubRepo(
+  repoName: string
+): Promise<{ ok: true; project: ProjectItem } | { ok: false; error: string }> {
+  try {
+    const accessToken = await requireAccessToken();
+    const owner = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
+
+    const { name, description, url, techStack } = await fetchProjectTechStack(
+      accessToken,
+      owner,
+      repoName
+    );
+
+    if (!techStack) {
+      throw new Error(
+        "GitHub reports no detectable languages for this repo (empty or a meta-repo with unreadable submodules)."
+      );
+    }
+
+    const highlights = await generateProjectHighlights({
+      repoName: name,
+      repoDescription: description,
+      techStack,
+    });
+
+    const project: ProjectItem = {
+      name,
+      description,
+      highlights,
+      links: [{ label: name, url }],
+    };
+
+    return { ok: true, project };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
   }

@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, StringListEditor, Button, EntityCard, SectionHeader } from "@/components/FormControls";
+import { Field, StringListEditor, Button, SectionHeader } from "@/components/FormControls";
+import { ItemGrid } from "@/components/ItemGrid";
 import { BriefcaseIcon } from "@/components/icons";
 import type { WorkItem } from "@/lib/types";
 
@@ -39,15 +40,15 @@ export function WorkSection({
           </Button>
         }
       />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {items.map((item, i) => (
-          <EntityCard
-            key={i}
-            icon={BriefcaseIcon}
-            color="violet"
-            title={item.position || "New position"}
-            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
-          >
+      <ItemGrid
+        items={items}
+        icon={BriefcaseIcon}
+        color="violet"
+        getTitle={(item) => item.position}
+        getSubtitle={(item) => item.name}
+        onRemove={(i) => onChange(items.filter((_, idx) => idx !== i))}
+        renderDetail={(item, i) => (
+          <div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Position" value={item.position} onChange={(v) => update(i, { position: v })} />
               <Field label="Company" value={item.name} onChange={(v) => update(i, { name: v })} />
@@ -62,9 +63,9 @@ export function WorkSection({
                 onChange={(v) => update(i, { highlights: v })}
               />
             </div>
-          </EntityCard>
-        ))}
-      </div>
+          </div>
+        )}
+      />
     </div>
   );
 }

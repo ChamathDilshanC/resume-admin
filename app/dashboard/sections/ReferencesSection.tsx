@@ -1,6 +1,7 @@
 "use client";
 
-import { Field, Button, EntityCard, SectionHeader } from "@/components/FormControls";
+import { Field, Button, SectionHeader } from "@/components/FormControls";
+import { ItemGrid } from "@/components/ItemGrid";
 import { UsersIcon } from "@/components/icons";
 import type { ReferenceItem } from "@/lib/types";
 
@@ -31,26 +32,25 @@ export function ReferencesSection({
           </Button>
         }
       />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {items.map((item, i) => (
-          <EntityCard
-            key={i}
-            icon={UsersIcon}
-            color="emerald"
-            title={item.name || "New reference"}
-            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
-          >
-            <div className="space-y-3">
-              <Field label="Name" value={item.name} onChange={(v) => update(i, { name: v })} />
-              <Field
-                label="Reference (title | company | phone)"
-                value={item.reference}
-                onChange={(v) => update(i, { reference: v })}
-              />
-            </div>
-          </EntityCard>
-        ))}
-      </div>
+      <ItemGrid
+        items={items}
+        icon={UsersIcon}
+        color="emerald"
+        columns="lg:grid-cols-2 xl:grid-cols-3"
+        getTitle={(item) => item.name}
+        getSubtitle={(item) => item.reference}
+        onRemove={(i) => onChange(items.filter((_, idx) => idx !== i))}
+        renderDetail={(item, i) => (
+          <div className="space-y-3">
+            <Field label="Name" value={item.name} onChange={(v) => update(i, { name: v })} />
+            <Field
+              label="Reference (title | company | phone)"
+              value={item.reference}
+              onChange={(v) => update(i, { reference: v })}
+            />
+          </div>
+        )}
+      />
     </div>
   );
 }

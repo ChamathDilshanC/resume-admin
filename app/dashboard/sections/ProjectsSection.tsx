@@ -1,8 +1,10 @@
 "use client";
 
-import { Field, StringListEditor, Button, IconButton, EntityCard, SectionHeader } from "@/components/FormControls";
+import { Field, StringListEditor, Button, IconButton, SectionHeader } from "@/components/FormControls";
+import { ItemGrid } from "@/components/ItemGrid";
 import { FolderIcon, TrashIcon, PlusIcon } from "@/components/icons";
 import type { ProjectItem } from "@/lib/types";
+import { AddProjectMenu } from "./AddProjectMenu";
 
 const EMPTY_PROJECT: ProjectItem = { name: "", description: "", highlights: [], links: [] };
 
@@ -26,20 +28,21 @@ export function ProjectsSection({
         color="teal"
         title="Projects"
         action={
-          <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_PROJECT }, ...items])}>
-            + Add project
-          </Button>
+          <AddProjectMenu
+            onAddBlank={() => onChange([{ ...EMPTY_PROJECT }, ...items])}
+            onAddGenerated={(project) => onChange([project, ...items])}
+          />
         }
       />
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {items.map((item, i) => (
-          <EntityCard
-            key={i}
-            icon={FolderIcon}
-            color="teal"
-            title={item.name || "New project"}
-            onRemove={() => onChange(items.filter((_, idx) => idx !== i))}
-          >
+      <ItemGrid
+        items={items}
+        icon={FolderIcon}
+        color="teal"
+        getTitle={(item) => item.name}
+        getSubtitle={(item) => item.description}
+        onRemove={(i) => onChange(items.filter((_, idx) => idx !== i))}
+        renderDetail={(item, i) => (
+          <div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Name" value={item.name} onChange={(v) => update(i, { name: v })} />
               <Field
@@ -99,9 +102,9 @@ export function ProjectsSection({
                 onChange={(v) => update(i, { highlights: v })}
               />
             </div>
-          </EntityCard>
-        ))}
-      </div>
+          </div>
+        )}
+      />
     </div>
   );
 }
