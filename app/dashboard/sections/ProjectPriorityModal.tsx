@@ -8,6 +8,8 @@ import { ListIcon } from "@/components/icons";
 import { GripVerticalIcon } from "lucide-react";
 import type { ProjectItem } from "@/lib/types";
 
+type ProjectItemWithId = ProjectItem & { _id: string };
+
 export function ProjectPriorityModal({
   items,
   onSave,
@@ -16,17 +18,18 @@ export function ProjectPriorityModal({
   onSave: (items: ProjectItem[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [orderedItems, setOrderedItems] = useState<ProjectItem[]>(items);
+  const [orderedItems, setOrderedItems] = useState<ProjectItemWithId[]>([]);
 
   // Sync state when items change or modal opens
   useEffect(() => {
     if (open) {
-      setOrderedItems(items);
+      setOrderedItems(items.map((item) => ({ ...item, _id: crypto.randomUUID() })));
     }
   }, [items, open]);
 
   const handleSave = () => {
-    onSave(orderedItems);
+    const cleanItems = orderedItems.map(({ _id, ...rest }) => rest as ProjectItem);
+    onSave(cleanItems);
     setOpen(false);
   };
 
@@ -42,11 +45,11 @@ export function ProjectPriorityModal({
       >
         <ListIcon className="h-4 w-4" /> Manage Priority
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[450px] max-h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-[66vw] max-w-[90vw] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Project Priority List</DialogTitle>
         </DialogHeader>
-        <div className="py-4 flex-1 overflow-y-auto min-h-0">
+        <div className="py-4 flex-1 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <p className="mb-4 text-sm text-gray-500">
             Drag and drop projects to change their order in the generated PDF. The priority number is shown next to the name.
           </p>
@@ -58,8 +61,7 @@ export function ProjectPriorityModal({
           >
             {orderedItems.map((item, index) => (
               <Reorder.Item
-                // We use item.name + index to guarantee a unique string key that framer-motion requires.
-                key={`${item.name}-${index}`}
+                key={item._id}
                 value={item}
                 className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing"
               >

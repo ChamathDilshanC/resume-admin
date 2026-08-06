@@ -109,7 +109,7 @@ export function AddProjectMenu({
           </DialogHeader>
 
           {step === "picker" && (
-            <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <Field label="Search your repos" value={query} onChange={setQuery} placeholder="Type to filter..." />
               {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
               <div className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
@@ -122,18 +122,18 @@ export function AddProjectMenu({
                       key={repo.name}
                       type="button"
                       onClick={() => handlePickRepo(repo)}
-                      className="flex w-full flex-col items-start rounded-lg px-3 py-2 text-left transition-colors hover:bg-gray-50"
+                      className="flex w-full min-w-0 flex-col items-start rounded-lg px-3 py-2 text-left transition-colors hover:bg-gray-50"
                     >
-                      <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
-                        {repo.name}
+                      <span className="flex w-full min-w-0 items-center gap-1.5 text-sm font-medium text-gray-900">
+                        <span className="truncate">{repo.name}</span>
                         {repo.private && (
-                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
+                          <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
                             private
                           </span>
                         )}
                       </span>
                       {repo.description && (
-                        <span className="truncate text-xs text-gray-500">{repo.description}</span>
+                        <span className="w-full truncate text-xs text-gray-500">{repo.description}</span>
                       )}
                     </button>
                   ))}
