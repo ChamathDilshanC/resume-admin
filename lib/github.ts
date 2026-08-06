@@ -2,7 +2,11 @@ import { Octokit } from "@octokit/rest";
 import type { ResumeData } from "./types";
 
 const REPO_OWNER = process.env.RESUME_REPO_OWNER || "ChamathDilshanC";
+// resume-core: pipeline code — PDF workflow dispatch + assets/ (profile photo, logo)
 const REPO_NAME = process.env.RESUME_REPO_NAME || "resume-core";
+// resume-data: private repo holding just resume.json (contact details, reference
+// phone numbers) — kept out of the public resume-core repo
+const DATA_REPO_NAME = process.env.RESUME_DATA_REPO_NAME || "resume-data";
 const RESUME_PATH = "resume.json";
 const PDF_WORKFLOW_FILE = "regenerate-pdf.yml";
 
@@ -14,7 +18,7 @@ export async function fetchResumeJson(accessToken: string): Promise<{ data: Resu
   const octokit = client(accessToken);
   const response = await octokit.repos.getContent({
     owner: REPO_OWNER,
-    repo: REPO_NAME,
+    repo: DATA_REPO_NAME,
     path: RESUME_PATH,
   });
 
@@ -37,7 +41,7 @@ export async function saveResumeJson(
 
   await octokit.repos.createOrUpdateFileContents({
     owner: REPO_OWNER,
-    repo: REPO_NAME,
+    repo: DATA_REPO_NAME,
     path: RESUME_PATH,
     message: commitMessage,
     content,
