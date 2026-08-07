@@ -17,6 +17,7 @@ import type { RepoSummary } from "@/lib/github";
 import { listGithubRepos, generateProjectFromGithubRepo } from "../actions";
 
 type Step = "picker" | "generating" | "review";
+type VisibilityFilter = "all" | "public" | "private";
 
 export function AddProjectMenu({
   onAddBlank,
@@ -30,6 +31,7 @@ export function AddProjectMenu({
   const [repos, setRepos] = useState<RepoSummary[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [query, setQuery] = useState("");
+  const [visibility, setVisibility] = useState<VisibilityFilter>("all");
   const [draft, setDraft] = useState<ProjectItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +40,7 @@ export function AddProjectMenu({
     setDraft(null);
     setError(null);
     setQuery("");
+    setVisibility("all");
   }
 
   async function openImportDialog() {
@@ -74,7 +77,9 @@ export function AddProjectMenu({
     reset();
   }
 
-  const filteredRepos = repos.filter((r) => r.name.toLowerCase().includes(query.toLowerCase()));
+  const filteredRepos = repos
+    .filter((r) => visibility === "all" || (visibility === "private") === r.private)
+    .filter((r) => r.name.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <>
@@ -110,7 +115,27 @@ export function AddProjectMenu({
 
           {step === "picker" && (
             <div className="mt-2 min-h-0 flex-1 overflow-y-auto pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <Field label="Search your repos" value={query} onChange={setQuery} placeholder="Type to filter..." />
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <Field label="Search your repos" value={query} onChange={setQuery} placeholder="Type to filter..." />
+                </div>
+                <div className="flex shrink-0 gap-0.5 rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+                  {(["all", "public", "private"] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setVisibility(option)}
+                      className={`rounded-md px-2.5 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                        visibility === option
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
               <div className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
                 {loadingRepos && (
@@ -138,7 +163,9 @@ export function AddProjectMenu({
                     </button>
                   ))}
                 {!loadingRepos && filteredRepos.length === 0 && (
-                  <p className="col-span-2 py-6 text-center text-sm text-gray-400">No repos match.</p>
+                  <p className="col-span-2 py-6 text-center text-sm text-gray-400">
+                    No {visibility !== "all" ? visibility : ""} repos match.
+                  </p>
                 )}
               </div>
             </div>

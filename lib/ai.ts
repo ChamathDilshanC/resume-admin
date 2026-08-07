@@ -33,45 +33,29 @@ class AIRequestError extends Error {
   }
 }
 
-// 503 = model overloaded ("high demand"), 429 = rate limited. Both are worth
-// retrying against a different model rather than failing the whole request.
+// 503 = model overloaded ("high demand"), 429 = per-key rate/quota limited.
+// Both are worth retrying against a different model or key rather than
+// failing the whole request.
 function isRetryableStatus(status: number): boolean {
   return status === 503 || status === 429;
 }
 
-const GITHUB_MODELS_FALLBACKS = ["openai/gpt-4o-mini", "openai/gpt-4o", "meta/meta-llama-3.1-8b-instruct"];
-const GEMINI_MODEL_FALLBACKS = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"];
+// Gemini 1.5 and 2.0 model families were shut down during 2026 — only the
+// 2.5+/3.x families are still live on v1beta. Cheapest/fastest first.
+const GEMINI_MODEL_FALLBACKS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
 
-async function callGithubModels(systemPrompt: string, userPrompt: string, model: string): Promise<string> {
-  const apiUrl = process.env.AI_API_URL || "https://models.github.ai/inference/chat/completions";
-
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.AI_API_KEY}`,
-      "Content-Type": "application/json",
-      Accept: "application/vnd.github+json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.3,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new AIRequestError(`AI API request failed (${response.status}): ${await response.text()}`, response.status);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
+// AI_API_KEY may hold a single key or a comma-separated list. Multiple keys
+// (e.g. from separate Google accounts) let us hop to a fresh quota when one
+// key gets rate-limited (429) instead of failing outright.
+function getApiKeys(): string[] {
+  return (process.env.AI_API_KEY || "")
+    .split(",")
+    .map((key) => key.trim())
+    .filter(Boolean);
 }
 
-async function callGemini(systemPrompt: string, userPrompt: string, model: string): Promise<string> {
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.AI_API_KEY}`;
+async function callGemini(systemPrompt: string, userPrompt: string, model: string, apiKey: string): Promise<string> {
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(apiUrl, {
     method: "POST",
@@ -109,7 +93,8 @@ export async function generateProjectHighlights(params: {
   repoDescription: string;
   techStack: string;
 }): Promise<string[]> {
-  if (!process.env.AI_API_KEY) {
+  const apiKeys = getApiKeys();
+  if (apiKeys.length === 0) {
     throw new Error("AI_API_KEY is not configured for resume-admin.");
   }
 
@@ -119,27 +104,25 @@ export async function generateProjectHighlights(params: {
     `Technologies Used: ${params.techStack}`,
   ].join("\n");
 
-  const provider = process.env.AI_PROVIDER || "github-models";
   const configuredModel = process.env.AI_MODEL;
-  const fallbacks = provider === "gemini" ? GEMINI_MODEL_FALLBACKS : GITHUB_MODELS_FALLBACKS;
-  const modelsToTry = configuredModel
-    ? [configuredModel, ...fallbacks.filter((model) => model !== configuredModel)]
-    : fallbacks;
+  const models = configuredModel
+    ? [configuredModel, ...GEMINI_MODEL_FALLBACKS.filter((model) => model !== configuredModel)]
+    : GEMINI_MODEL_FALLBACKS;
 
   let lastError: unknown;
-  for (const model of modelsToTry) {
-    try {
-      const rawText =
-        provider === "gemini"
-          ? await callGemini(PROJECT_SYSTEM_PROMPT, userPrompt, model)
-          : await callGithubModels(PROJECT_SYSTEM_PROMPT, userPrompt, model);
-      return extractJsonArray(rawText);
-    } catch (error) {
-      lastError = error;
-      if (!(error instanceof AIRequestError) || !isRetryableStatus(error.status)) {
-        throw error;
+  for (const model of models) {
+    for (const apiKey of apiKeys) {
+      try {
+        const rawText = await callGemini(PROJECT_SYSTEM_PROMPT, userPrompt, model, apiKey);
+        return extractJsonArray(rawText);
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof AIRequestError) || !isRetryableStatus(error.status)) {
+          throw error;
+        }
+        // Overloaded/rate-limited: fall through and retry with the next key,
+        // then the next model once all keys for this model are exhausted.
       }
-      // Overloaded/rate-limited: fall through and retry with the next model.
     }
   }
 
