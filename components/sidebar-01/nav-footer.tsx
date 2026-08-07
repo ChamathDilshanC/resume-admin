@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { LogOut } from "lucide-react";
+import { LogOut, HardDrive } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -12,7 +12,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarFooter, SidebarMenu, SidebarMenuItem } from "@/components/ui/sidebar";
+import {
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
+
+const driveFileId = process.env.NEXT_PUBLIC_GDRIVE_FILE_ID;
 
 export function NavFooter() {
   const { data: session } = useSession();
@@ -21,6 +29,28 @@ export function NavFooter() {
 
   return (
     <SidebarFooter className="p-3">
+      {driveFileId && (
+        <>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                render={
+                  <a
+                    href={`https://drive.google.com/file/d/${driveFileId}/view`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
+                tooltip="View the live PDF on Google Drive"
+              >
+                <HardDrive className="opacity-80" />
+                <span>Drive</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <SidebarSeparator className="my-1" />
+        </>
+      )}
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>
