@@ -23,9 +23,27 @@ EXAMPLE OUTPUT:
   "Architected the system as a multi-repository monorepo with Git submodules and comprehensive architecture documentation."
 ]`;
 
-async function callGithubModels(systemPrompt: string, userPrompt: string): Promise<string> {
+class AIRequestError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message);
+    this.name = "AIRequestError";
+  }
+}
+
+// 503 = model overloaded ("high demand"), 429 = rate limited. Both are worth
+// retrying against a different model rather than failing the whole request.
+function isRetryableStatus(status: number): boolean {
+  return status === 503 || status === 429;
+}
+
+const GITHUB_MODELS_FALLBACKS = ["openai/gpt-4o-mini", "openai/gpt-4o", "meta/meta-llama-3.1-8b-instruct"];
+const GEMINI_MODEL_FALLBACKS = ["gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"];
+
+async function callGithubModels(systemPrompt: string, userPrompt: string, model: string): Promise<string> {
   const apiUrl = process.env.AI_API_URL || "https://models.github.ai/inference/chat/completions";
-  const model = process.env.AI_MODEL || "openai/gpt-4o-mini";
 
   const response = await fetch(apiUrl, {
     method: "POST",
@@ -45,15 +63,14 @@ async function callGithubModels(systemPrompt: string, userPrompt: string): Promi
   });
 
   if (!response.ok) {
-    throw new Error(`AI API request failed (${response.status}): ${await response.text()}`);
+    throw new AIRequestError(`AI API request failed (${response.status}): ${await response.text()}`, response.status);
   }
 
   const data = await response.json();
   return data.choices[0].message.content;
 }
 
-async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const model = process.env.AI_MODEL || "gemini-flash-latest";
+async function callGemini(systemPrompt: string, userPrompt: string, model: string): Promise<string> {
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.AI_API_KEY}`;
 
   const response = await fetch(apiUrl, {
@@ -66,7 +83,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   });
 
   if (!response.ok) {
-    throw new Error(`AI API request failed (${response.status}): ${await response.text()}`);
+    throw new AIRequestError(`AI API request failed (${response.status}): ${await response.text()}`, response.status);
   }
 
   const data = await response.json();
@@ -103,10 +120,28 @@ export async function generateProjectHighlights(params: {
   ].join("\n");
 
   const provider = process.env.AI_PROVIDER || "github-models";
-  const rawText =
-    provider === "gemini"
-      ? await callGemini(PROJECT_SYSTEM_PROMPT, userPrompt)
-      : await callGithubModels(PROJECT_SYSTEM_PROMPT, userPrompt);
+  const configuredModel = process.env.AI_MODEL;
+  const fallbacks = provider === "gemini" ? GEMINI_MODEL_FALLBACKS : GITHUB_MODELS_FALLBACKS;
+  const modelsToTry = configuredModel
+    ? [configuredModel, ...fallbacks.filter((model) => model !== configuredModel)]
+    : fallbacks;
 
-  return extractJsonArray(rawText);
+  let lastError: unknown;
+  for (const model of modelsToTry) {
+    try {
+      const rawText =
+        provider === "gemini"
+          ? await callGemini(PROJECT_SYSTEM_PROMPT, userPrompt, model)
+          : await callGithubModels(PROJECT_SYSTEM_PROMPT, userPrompt, model);
+      return extractJsonArray(rawText);
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof AIRequestError) || !isRetryableStatus(error.status)) {
+        throw error;
+      }
+      // Overloaded/rate-limited: fall through and retry with the next model.
+    }
+  }
+
+  throw lastError;
 }
