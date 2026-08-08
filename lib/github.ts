@@ -124,6 +124,79 @@ export async function fetchAsset(
   return { buffer, contentType };
 }
 
+export interface TemplateSummary {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export async function listTemplates(accessToken: string): Promise<TemplateSummary[]> {
+  const octokit = client(accessToken);
+  const response = await octokit.repos.getContent({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    path: "templates",
+  });
+
+  if (!Array.isArray(response.data)) {
+    throw new Error("templates directory not found in resume-core");
+  }
+
+  const templates: TemplateSummary[] = [];
+  for (const entry of response.data) {
+    if (entry.type !== "dir") continue;
+    let label = entry.name;
+    let description = "";
+    try {
+      const meta = await octokit.repos.getContent({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: `templates/${entry.name}/meta.json`,
+      });
+      if (!Array.isArray(meta.data) && meta.data.type === "file") {
+        const parsed = JSON.parse(Buffer.from(meta.data.content, "base64").toString("utf8"));
+        label = parsed.label || entry.name;
+        description = parsed.description || "";
+      }
+    } catch {
+      // No meta.json — fall back to the directory name.
+    }
+    templates.push({ id: entry.name, label, description });
+  }
+  return templates;
+}
+
+export async function fetchTemplateFiles(
+  accessToken: string,
+  templateId: string
+): Promise<{ templateHtml: string; stylesCss: string }> {
+  const octokit = client(accessToken);
+
+  const [templateRes, stylesRes] = await Promise.all([
+    octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: `templates/${templateId}/template.html`,
+    }),
+    octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: `templates/${templateId}/styles.css`,
+    }),
+  ]);
+
+  if (Array.isArray(templateRes.data) || Array.isArray(stylesRes.data)) {
+    throw new Error(`Template "${templateId}" files not found`);
+  }
+  if (templateRes.data.type !== "file" || stylesRes.data.type !== "file") {
+    throw new Error(`Template "${templateId}" files not found`);
+  }
+  return {
+    templateHtml: Buffer.from(templateRes.data.content, "base64").toString("utf8"),
+    stylesCss: Buffer.from(stylesRes.data.content, "base64").toString("utf8"),
+  };
+}
+
 export { extensionOf, ASSET_MIME_TYPES };
 
 export interface RepoSummary {

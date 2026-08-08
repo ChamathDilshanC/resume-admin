@@ -155,6 +155,17 @@ export function ListIcon({ className }: IconProps) {
   );
 }
 
+export function TemplateIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="4" y="3.5" width="16" height="17" rx="2" />
+      <path d="M8 7.5h8" />
+      <path d="M8 11h8" />
+      <path d="M8 14.5h5" />
+    </svg>
+  );
+}
+
 export function ChevronRightIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

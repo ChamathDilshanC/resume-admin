@@ -7,11 +7,16 @@ import {
   saveResumeJson,
   triggerPdfRegeneration,
   uploadAsset,
+  fetchAsset,
   extensionOf,
   listUserRepos,
+  listTemplates,
+  fetchTemplateFiles,
   fetchProjectTechStack,
   type RepoSummary,
+  type TemplateSummary,
 } from "@/lib/github";
+import { renderTemplatePreview } from "@/lib/preview";
 import { generateProjectHighlights } from "@/lib/ai";
 import type { ResumeData, ProjectItem } from "@/lib/types";
 
@@ -67,6 +72,45 @@ export async function uploadPhoto(
     const assetPath = `assets/profile${ext}`;
     await uploadAsset(accessToken, assetPath, buffer, "chore: update profile photo via resume-admin");
     return { ok: true, path: assetPath };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function listTemplatesAction(): Promise<
+  { ok: true; templates: TemplateSummary[] } | { ok: false; error: string }
+> {
+  try {
+    const accessToken = await requireAccessToken();
+    const templates = await listTemplates(accessToken);
+    return { ok: true, templates };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function previewTemplateAction(
+  templateId: string,
+  data: ResumeData
+): Promise<{ ok: true; html: string } | { ok: false; error: string }> {
+  try {
+    const accessToken = await requireAccessToken();
+    const { templateHtml, stylesCss } = await fetchTemplateFiles(accessToken, templateId);
+
+    // Resolve the profile photo from resume-core/assets so the preview shows
+    // the real photo; fall back to no photo if it cannot be fetched.
+    const previewData: ResumeData = { ...data, basics: { ...data.basics } };
+    if (previewData.basics.image && !previewData.basics.image.startsWith("data:")) {
+      try {
+        const { buffer, contentType } = await fetchAsset(accessToken, previewData.basics.image);
+        previewData.basics.image = `data:${contentType};base64,${buffer.toString("base64")}`;
+      } catch {
+        previewData.basics.image = "";
+      }
+    }
+
+    const html = renderTemplatePreview(templateHtml, stylesCss, previewData);
+    return { ok: true, html };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
   }

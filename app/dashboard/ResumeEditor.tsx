@@ -13,6 +13,7 @@ import {
   AcademicCapIcon,
   BadgeCheckIcon,
   UsersIcon,
+  TemplateIcon,
 } from "@/components/icons";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar-01/app-sidebar";
@@ -25,6 +26,7 @@ import { SkillsSection } from "./sections/SkillsSection";
 import { EducationSection } from "./sections/EducationSection";
 import { CertificatesSection } from "./sections/CertificatesSection";
 import { ReferencesSection } from "./sections/ReferencesSection";
+import { TemplatesSection } from "./sections/TemplatesSection";
 
 type Tab =
   | "basics"
@@ -33,7 +35,8 @@ type Tab =
   | "skills"
   | "education"
   | "certificates"
-  | "references";
+  | "references"
+  | "templates";
 
 function buildNavItems(data: ResumeData): ResumeNavItem[] {
   return [
@@ -50,6 +53,7 @@ function buildNavItems(data: ResumeData): ResumeNavItem[] {
       count: data.certificates.length,
     },
     { id: "references", title: "References", icon: UsersIcon, color: "emerald", count: data.references.length },
+    { id: "templates", title: "Templates", icon: TemplateIcon, color: "teal", count: null },
   ];
 }
 
@@ -61,6 +65,7 @@ const TAB_TITLES: Record<Tab, string> = {
   education: "Education",
   certificates: "Certificates",
   references: "References",
+  templates: "Templates",
 };
 
 export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
@@ -153,6 +158,13 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
                   <ReferencesSection
                     items={data.references}
                     onChange={(references) => setData({ ...data, references })}
+                  />
+                )}
+                {activeTab === "templates" && (
+                  <TemplatesSection
+                    activeTemplate={data.template || "default"}
+                    data={data}
+                    onSelect={(templateId) => setData({ ...data, template: templateId })}
                   />
                 )}
               </motion.div>

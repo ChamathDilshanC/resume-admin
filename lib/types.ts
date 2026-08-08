@@ -68,6 +68,7 @@ export interface ReferenceItem {
 }
 
 export interface ResumeData {
+  template?: string;
   basics: ResumeBasics;
   work: WorkItem[];
   skills: SkillItem[];
