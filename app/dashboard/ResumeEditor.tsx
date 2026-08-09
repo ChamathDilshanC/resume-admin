@@ -128,10 +128,18 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
                 transition={{ duration: 0.18, ease: "easeOut" }}
               >
                 {activeTab === "basics" && (
-                  <BasicsSection basics={data.basics} onChange={(basics) => setData({ ...data, basics })} />
+                  <BasicsSection
+                    basics={data.basics}
+                    onChange={(basics) => setData({ ...data, basics })}
+                    resumeData={data}
+                  />
                 )}
                 {activeTab === "work" && (
-                  <WorkSection items={data.work} onChange={(work) => setData({ ...data, work })} />
+                  <WorkSection
+                    items={data.work}
+                    onChange={(work) => setData({ ...data, work })}
+                    resumeData={data}
+                  />
                 )}
                 {activeTab === "projects" && (
                   <ProjectsSection

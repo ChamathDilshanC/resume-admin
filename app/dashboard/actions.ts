@@ -17,7 +17,7 @@ import {
   type TemplateSummary,
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
-import { generateProjectHighlights } from "@/lib/ai";
+import { generateProjectHighlights, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
 import type { ResumeData, ProjectItem } from "@/lib/types";
 
 interface SessionWithToken {
@@ -126,6 +126,63 @@ export async function listGithubRepos(): Promise<
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
+}
+
+export async function optimizeSummaryAction(
+  data: ResumeData
+): Promise<{ ok: true; summary: string } | { ok: false; error: string }> {
+  try {
+    await requireAccessToken();
+    const summary = await optimizeSummaryForAts({
+      label: data.basics.label,
+      currentSummary: data.basics.summary,
+      yearsOfExperience: yearsOfExperienceOf(data),
+      skillKeywords: skillKeywordsOf(data),
+      workContext: data.work
+        .map((w) => `${w.position} at ${w.name} (${w.startDate || "?"} to ${w.endDate || "present"})`)
+        .join("; "),
+    });
+    return { ok: true, summary };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function optimizeWorkAction(
+  data: ResumeData
+): Promise<{ ok: true; work: ResumeData["work"] } | { ok: false; error: string }> {
+  try {
+    await requireAccessToken();
+    const skillKeywords = skillKeywordsOf(data);
+    const work = await Promise.all(
+      data.work.map(async (item) => {
+        if (item.highlights.length === 0) return item;
+        const highlights = await optimizeWorkHighlightsForAts({
+          position: item.position,
+          company: item.name,
+          highlights: item.highlights,
+          skillKeywords,
+        });
+        return { ...item, highlights };
+      })
+    );
+    return { ok: true, work };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+function yearsOfExperienceOf(data: ResumeData): number {
+  const years = data.work
+    .map((w) => Number((w.startDate || "").slice(0, 4)))
+    .filter((y) => Number.isFinite(y) && y > 1990);
+  if (years.length === 0) return 0;
+  const earliest = Math.min(...years);
+  return Math.max(0, Math.floor((Date.now() - new Date(earliest, 0, 1).getTime()) / (365.25 * 24 * 3600 * 1000)));
+}
+
+function skillKeywordsOf(data: ResumeData): string[] {
+  return data.skills.flatMap((s) => s.keywords).slice(0, 60);
 }
 
 export async function generateProjectFromGithubRepo(

@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import { gooeyToast } from "goey-toast";
 import { Field, StringListEditor, Button, SectionHeader } from "@/components/FormControls";
 import { ItemGrid } from "@/components/ItemGrid";
-import { BriefcaseIcon } from "@/components/icons";
-import type { WorkItem } from "@/lib/types";
+import { BriefcaseIcon, SparklesIcon } from "@/components/icons";
+import type { ResumeData, WorkItem } from "@/lib/types";
+import { optimizeWorkAction } from "../actions";
 
 const EMPTY_WORK: WorkItem = {
   name: "",
@@ -18,14 +21,32 @@ const EMPTY_WORK: WorkItem = {
 export function WorkSection({
   items,
   onChange,
+  resumeData,
 }: {
   items: WorkItem[];
   onChange: (items: WorkItem[]) => void;
+  resumeData: ResumeData;
 }) {
+  const [optimizing, setOptimizing] = useState(false);
+
   function update(i: number, patch: Partial<WorkItem>) {
     const next = [...items];
     next[i] = { ...next[i], ...patch };
     onChange(next);
+  }
+
+  async function handleAiOptimizeWork() {
+    setOptimizing(true);
+    const result = await optimizeWorkAction({ ...resumeData, work: items });
+    setOptimizing(false);
+    if (result.ok) {
+      onChange(result.work);
+      gooeyToast.success("Highlights optimized", {
+        description: "AI rewrote your work highlights for ATS. Review them, then Save.",
+      });
+    } else {
+      gooeyToast.error("AI optimize failed", { description: result.error });
+    }
   }
 
   return (
@@ -35,9 +56,17 @@ export function WorkSection({
         color="violet"
         title="Work Experience"
         action={
-          <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_WORK }, ...items])}>
-            + Add work item
-          </Button>
+          <span className="inline-flex items-center gap-2">
+            <Button variant="secondary" onClick={handleAiOptimizeWork} disabled={optimizing}>
+              <span className="inline-flex items-center gap-1.5">
+                <SparklesIcon className="h-3.5 w-3.5" />
+                {optimizing ? "Optimizing…" : "AI Optimize (ATS)"}
+              </span>
+            </Button>
+            <Button variant="secondary" onClick={() => onChange([{ ...EMPTY_WORK }, ...items])}>
+              + Add work item
+            </Button>
+          </span>
         }
       />
       <ItemGrid

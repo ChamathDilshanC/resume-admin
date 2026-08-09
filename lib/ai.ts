@@ -54,6 +54,114 @@ function getApiKeys(): string[] {
     .filter(Boolean);
 }
 
+async function callGeminiWithFallback(systemPrompt: string, userPrompt: string): Promise<string> {
+  const apiKeys = getApiKeys();
+  if (apiKeys.length === 0) {
+    throw new Error("AI_API_KEY is not configured for resume-admin.");
+  }
+
+  const configuredModel = process.env.AI_MODEL;
+  const models = configuredModel
+    ? [configuredModel, ...GEMINI_MODEL_FALLBACKS.filter((model) => model !== configuredModel)]
+    : GEMINI_MODEL_FALLBACKS;
+
+  let lastError: unknown;
+  for (const model of models) {
+    for (const apiKey of apiKeys) {
+      try {
+        return await callGemini(systemPrompt, userPrompt, model, apiKey);
+      } catch (error) {
+        lastError = error;
+        if (!(error instanceof AIRequestError) || !isRetryableStatus(error.status)) {
+          throw error;
+        }
+        // Overloaded/rate-limited: fall through and retry with the next key,
+        // then the next model once all keys for this model are exhausted.
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+export async function generateProjectHighlights(params: {
+  repoName: string;
+  repoDescription: string;
+  techStack: string;
+}): Promise<string[]> {
+  const userPrompt = [
+    `Project Name: ${params.repoName}`,
+    `Project Description: ${params.repoDescription}`,
+    `Technologies Used: ${params.techStack}`,
+  ].join("\n");
+
+  return extractJsonArray(await callGeminiWithFallback(PROJECT_SYSTEM_PROMPT, userPrompt));
+}
+
+const SUMMARY_SYSTEM_PROMPT = `You are an expert technical resume writer specializing in ATS (Applicant Tracking System) optimization.
+Rewrite a candidate's professional summary so it scores maximum ATS relevance.
+
+CRITICAL RULES:
+1. 3 to 5 sentences, single paragraph, no first-person pronouns (no "I", "my").
+2. Open with "<Adjective> <Target Job Title> with <N>+ years of hands-on experience ..." using the exact
+   target job title and the experience anchor provided. If years of experience is 0, omit the anchor.
+3. Naturally weave in the most relevant keywords from the provided skill list (including practices such as
+   SDLC, OOP, Agile/Scrum, unit testing, code reviews when present in the list). Never mention a skill that
+   is not in the provided list.
+4. Mention measurable scope only when supplied in the input (e.g. production deployments, freelance delivery).
+5. No buzzword stuffing, no cliches like "team player" or "hard worker".
+6. Return ONLY the paragraph text - no JSON, no quotes, no markdown.`;
+
+const WORK_BULLETS_SYSTEM_PROMPT = `You are an expert technical resume writer specializing in ATS (Applicant Tracking System) optimization.
+Rewrite work-experience bullet points so they score maximum ATS relevance while staying 100% truthful.
+
+CRITICAL RULES:
+1. Return the SAME number of bullets as the input, in the same order.
+2. Start every bullet with a strong action verb (Developed, Engineered, Implemented, Designed, Built,
+   Automated, Optimized, Resolved, Delivered, Integrated).
+3. Be outcome-oriented: state what changed or what was delivered, not just the duty.
+4. Preserve every fact from the original bullet (technologies, platforms, scope). Never invent technologies,
+   employers, or responsibilities that are not in the input.
+5. Keep any numbers/metrics present in the original. If the original has no metric, express scale
+   qualitatively ("multiple", "end-to-end", "cross-platform") - NEVER fabricate specific numbers.
+6. Weave in relevant keywords from the provided skill list only where truthful for that role.
+7. Each bullet 1 to 2 lines. You MUST return ONLY a valid JSON array of strings (no markdown, no labels).`;
+
+export async function optimizeSummaryForAts(params: {
+  label: string;
+  currentSummary: string;
+  yearsOfExperience: number;
+  skillKeywords: string[];
+  workContext: string;
+}): Promise<string> {
+  const userPrompt = [
+    `Target Job Title: ${params.label}`,
+    `Years Of Experience Anchor: ${params.yearsOfExperience}`,
+    `Current Summary: ${params.currentSummary}`,
+    `Work History: ${params.workContext}`,
+    `Skill Keywords: ${params.skillKeywords.join(", ")}`,
+  ].join("\n");
+
+  const text = await callGeminiWithFallback(SUMMARY_SYSTEM_PROMPT, userPrompt);
+  return text.trim().replace(/^"|"$/g, "").trim();
+}
+
+export async function optimizeWorkHighlightsForAts(params: {
+  position: string;
+  company: string;
+  highlights: string[];
+  skillKeywords: string[];
+}): Promise<string[]> {
+  const userPrompt = [
+    `Role: ${params.position}`,
+    `Company: ${params.company}`,
+    `Current Bullets:\n${params.highlights.map((h) => `- ${h}`).join("\n")}`,
+    `Skill Keywords: ${params.skillKeywords.join(", ")}`,
+  ].join("\n");
+
+  return extractJsonArray(await callGeminiWithFallback(WORK_BULLETS_SYSTEM_PROMPT, userPrompt));
+}
+
 async function callGemini(systemPrompt: string, userPrompt: string, model: string, apiKey: string): Promise<string> {
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -86,45 +194,4 @@ function extractJsonArray(rawText: string): string[] {
     throw new Error("AI response was not a JSON array of strings.");
   }
   return parsed;
-}
-
-export async function generateProjectHighlights(params: {
-  repoName: string;
-  repoDescription: string;
-  techStack: string;
-}): Promise<string[]> {
-  const apiKeys = getApiKeys();
-  if (apiKeys.length === 0) {
-    throw new Error("AI_API_KEY is not configured for resume-admin.");
-  }
-
-  const userPrompt = [
-    `Project Name: ${params.repoName}`,
-    `Project Description: ${params.repoDescription}`,
-    `Technologies Used: ${params.techStack}`,
-  ].join("\n");
-
-  const configuredModel = process.env.AI_MODEL;
-  const models = configuredModel
-    ? [configuredModel, ...GEMINI_MODEL_FALLBACKS.filter((model) => model !== configuredModel)]
-    : GEMINI_MODEL_FALLBACKS;
-
-  let lastError: unknown;
-  for (const model of models) {
-    for (const apiKey of apiKeys) {
-      try {
-        const rawText = await callGemini(PROJECT_SYSTEM_PROMPT, userPrompt, model, apiKey);
-        return extractJsonArray(rawText);
-      } catch (error) {
-        lastError = error;
-        if (!(error instanceof AIRequestError) || !isRetryableStatus(error.status)) {
-          throw error;
-        }
-        // Overloaded/rate-limited: fall through and retry with the next key,
-        // then the next model once all keys for this model are exhausted.
-      }
-    }
-  }
-
-  throw lastError;
 }

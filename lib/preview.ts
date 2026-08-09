@@ -45,6 +45,23 @@ Handlebars.registerHelper("stripProtocol", function (url: unknown) {
   return String(url || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
 });
 
+// ATS wants "City, Country" spelled out, but resume.json stores ISO codes.
+const COUNTRY_NAMES: Record<string, string> = {
+  LK: "Sri Lanka",
+  US: "United States",
+  GB: "United Kingdom",
+  IN: "India",
+  AU: "Australia",
+  CA: "Canada",
+  DE: "Germany",
+  SG: "Singapore",
+};
+
+Handlebars.registerHelper("countryName", function (code: unknown) {
+  const raw = String(code || "");
+  return COUNTRY_NAMES[raw.toUpperCase()] || raw;
+});
+
 Handlebars.registerHelper("gt", function (a: unknown, b: unknown) {
   return Number(a) > Number(b);
 });

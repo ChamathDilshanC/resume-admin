@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { gooeyToast } from "goey-toast";
 import { Field, TextArea, Card, Button, IconButton, SectionHeader } from "@/components/FormControls";
-import { UserIcon, TrashIcon, PlusIcon } from "@/components/icons";
-import type { ResumeBasics } from "@/lib/types";
+import { UserIcon, TrashIcon, PlusIcon, SparklesIcon } from "@/components/icons";
+import type { ResumeBasics, ResumeData } from "@/lib/types";
+import { optimizeSummaryAction } from "../actions";
 import { PhotoUploader } from "./PhotoUploader";
 
 function CardLabel({ children }: { children: React.ReactNode }) {
@@ -16,12 +19,30 @@ function CardLabel({ children }: { children: React.ReactNode }) {
 export function BasicsSection({
   basics,
   onChange,
+  resumeData,
 }: {
   basics: ResumeBasics;
   onChange: (basics: ResumeBasics) => void;
+  resumeData: ResumeData;
 }) {
+  const [optimizing, setOptimizing] = useState(false);
+
   function set<K extends keyof ResumeBasics>(key: K, value: ResumeBasics[K]) {
     onChange({ ...basics, [key]: value });
+  }
+
+  async function handleAiOptimizeSummary() {
+    setOptimizing(true);
+    const result = await optimizeSummaryAction(resumeData);
+    setOptimizing(false);
+    if (result.ok) {
+      onChange({ ...basics, summary: result.summary });
+      gooeyToast.success("Summary optimized", {
+        description: "AI rewrote your summary for ATS. Review it, then Save.",
+      });
+    } else {
+      gooeyToast.error("AI optimize failed", { description: result.error });
+    }
   }
 
   return (
@@ -62,7 +83,15 @@ export function BasicsSection({
 
       <div className="mt-4">
         <Card>
-          <CardLabel>Summary</CardLabel>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <CardLabel>Summary</CardLabel>
+            <Button variant="secondary" onClick={handleAiOptimizeSummary} disabled={optimizing}>
+              <span className="inline-flex items-center gap-1.5">
+                <SparklesIcon className="h-3.5 w-3.5" />
+                {optimizing ? "Optimizing…" : "AI Optimize (ATS)"}
+              </span>
+            </Button>
+          </div>
           <TextArea label="" value={basics.summary} onChange={(v) => set("summary", v)} rows={4} />
         </Card>
       </div>
