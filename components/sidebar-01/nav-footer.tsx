@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { LogOut, HardDrive } from "lucide-react";
+import { LogOut, HardDrive, BookOpen } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -29,28 +30,35 @@ export function NavFooter() {
 
   return (
     <SidebarFooter className="p-3">
-      {driveFileId && (
-        <>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                render={
-                  <a
-                    href={`https://drive.google.com/file/d/${driveFileId}/view`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
-                }
-                tooltip="View the live PDF on Google Drive"
-              >
-                <HardDrive className="opacity-80" />
-                <span>Drive</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <SidebarSeparator className="my-1" />
-        </>
-      )}
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            render={<Link href="/dashboard/docs" />}
+            tooltip="How the project pipeline works"
+          >
+            <BookOpen className="opacity-80" />
+            <span>Docs</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        {driveFileId && (
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              render={
+                <a
+                  href={`https://drive.google.com/file/d/${driveFileId}/view`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                />
+              }
+              tooltip="View the live PDF on Google Drive"
+            >
+              <HardDrive className="opacity-80" />
+              <span>Drive</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+      </SidebarMenu>
+      <SidebarSeparator className="my-1" />
       <SidebarMenu>
         <SidebarMenuItem>
           <DropdownMenu>
