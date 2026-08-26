@@ -14,6 +14,8 @@ export interface ResumeBasics {
     region: string;
   };
   profiles: { network: string; username: string; url: string }[];
+  targetCompany?: string;
+  hideDeclaration?: boolean;
 }
 
 export interface WorkItem {

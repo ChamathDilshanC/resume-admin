@@ -96,6 +96,36 @@ export function BasicsSection({
         </Card>
       </div>
 
+      <div className="mt-4">
+        <Card>
+          <CardLabel>Closing Declaration</CardLabel>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={basics.hideDeclaration ?? false}
+              onChange={(e) => set("hideDeclaration", e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-2 focus:ring-brand/15"
+            />
+            Hide closing declaration
+          </label>
+          {!basics.hideDeclaration && (
+            <div className="mt-3">
+              <Field
+                label="Target company (optional)"
+                value={basics.targetCompany || ""}
+                onChange={(v) => set("targetCompany", v)}
+                placeholder="e.g. Acme Corp"
+              />
+              <p className="mt-1.5 text-xs text-gray-400">
+                Named in the declaration&rsquo;s closing line when set (&ldquo;...serve at Acme
+                Corp&rdquo;); left blank, it falls back to &ldquo;...serve in your esteemed
+                organization&rdquo;.
+              </p>
+            </div>
+          )}
+        </Card>
+      </div>
+
       <div className="mt-6 flex items-center justify-between">
         <span className="text-sm font-semibold text-gray-700">Profiles</span>
         <Button
