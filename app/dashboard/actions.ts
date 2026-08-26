@@ -33,13 +33,41 @@ async function requireAccessToken(): Promise<string> {
   return accessToken;
 }
 
+// This browser tab holds its own copy of resume.json from whenever the
+// dashboard was first loaded. If the GitHub Actions pipeline auto-adds a
+// project (or anything else) in the meantime, a save from this stale tab
+// must not silently overwrite it. So: re-fetch the live file, and for every
+// section the user hasn't touched this session, keep the fresh remote value
+// instead of the stale one — only sections actually edited here win.
+function pickChanged<K extends keyof ResumeData>(
+  key: K,
+  current: ResumeData,
+  initial: ResumeData,
+  remote: ResumeData
+): ResumeData[K] {
+  return JSON.stringify(current[key]) === JSON.stringify(initial[key]) ? remote[key] : current[key];
+}
+
 export async function saveResume(
-  data: ResumeData
+  data: ResumeData,
+  initialData: ResumeData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const accessToken = await requireAccessToken();
-    const { sha } = await fetchResumeJson(accessToken);
-    await saveResumeJson(accessToken, data, sha, "chore: update resume content via resume-admin");
+    const { data: remote, sha } = await fetchResumeJson(accessToken);
+
+    const merged: ResumeData = {
+      template: pickChanged("template", data, initialData, remote),
+      basics: pickChanged("basics", data, initialData, remote),
+      work: pickChanged("work", data, initialData, remote),
+      skills: pickChanged("skills", data, initialData, remote),
+      projects: pickChanged("projects", data, initialData, remote),
+      certificates: pickChanged("certificates", data, initialData, remote),
+      education: pickChanged("education", data, initialData, remote),
+      references: pickChanged("references", data, initialData, remote),
+    };
+
+    await saveResumeJson(accessToken, merged, sha, "chore: update resume content via resume-admin");
     await triggerPdfRegeneration(accessToken);
     return { ok: true };
   } catch (error) {

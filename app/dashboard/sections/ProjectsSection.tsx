@@ -38,6 +38,10 @@ export function ProjectsSection({
           </div>
         }
       />
+      <p className="mb-5 text-sm text-gray-500">
+        Sections you haven&rsquo;t touched this session are refreshed from GitHub on save, so a
+        stale tab can&rsquo;t overwrite projects your pipeline added automatically in the meantime.
+      </p>
       <ItemGrid
         items={items}
         icon={FolderIcon}

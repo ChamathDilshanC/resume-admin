@@ -77,7 +77,7 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
 
   function handleSave() {
     startTransition(async () => {
-      const result = await saveResume(data);
+      const result = await saveResume(data, initialData);
       if (result.ok) {
         gooeyToast.success("Saved", {
           description: "resume.json committed — PDF is regenerating.",
