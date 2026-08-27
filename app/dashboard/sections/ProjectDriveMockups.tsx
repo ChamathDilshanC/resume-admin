@@ -20,9 +20,12 @@ import { syncProjectDriveFolder } from "../actions";
 export function ProjectDriveMockups({
   project,
   onChange,
+  onSaveAndSync,
 }: {
   project: ProjectItem;
   onChange: (patch: Partial<ProjectItem>) => void;
+  /** Persists this project's current state (plus an optional patch) to resume.json before the Drive workflow runs — it only ever sees what's actually saved. */
+  onSaveAndSync: (patch: Partial<ProjectItem>) => Promise<boolean>;
 }) {
   const [syncing, setSyncing] = useState(false);
   const mockups = project.mockups || [];
@@ -39,12 +42,17 @@ export function ProjectDriveMockups({
       });
       return;
     }
-    // Persist the recovered link so it's stored going forward, not
-    // re-derived from links every time.
-    if (!project.repoFullName) {
-      onChange({ repoFullName: linkedRepoFullName, repositoryType: project.repositoryType ?? "MAIN" });
-    }
     setSyncing(true);
+    // The Drive workflow reads resume.json as committed on GitHub — a
+    // freshly-imported project (or the just-recovered repoFullName) only
+    // exists in this browser tab until it's saved. Save first, every time,
+    // so the sync can never run against stale/missing data.
+    const patch = project.repoFullName ? {} : { repoFullName: linkedRepoFullName, repositoryType: project.repositoryType ?? "MAIN" as const };
+    const saved = await onSaveAndSync(patch);
+    if (!saved) {
+      setSyncing(false);
+      return;
+    }
     const result = await syncProjectDriveFolder(linkedRepoFullName);
     setSyncing(false);
     if (result.ok) {
@@ -91,10 +99,11 @@ export function ProjectDriveMockups({
             type="button"
             onClick={handleSync}
             disabled={syncing}
+            title="Saves this project to resume.json first, then runs the Drive sync"
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCwIcon className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-            {project.driveFolder ? "Sync Mockups" : "Create Drive Folder"}
+            {syncing ? "Saving & syncing" : project.driveFolder ? "Sync Mockups" : "Create Drive Folder"}
           </button>
         </div>
       </div>

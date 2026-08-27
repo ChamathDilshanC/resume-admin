@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { gooeyToast } from "goey-toast";
-import type { ResumeData } from "@/lib/types";
+import type { ResumeData, ProjectItem } from "@/lib/types";
 import { Button } from "@/components/FormControls";
 import {
   UserIcon,
@@ -75,17 +75,33 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
 
   const navItems = buildNavItems(data);
 
+  async function saveNow(nextData: ResumeData): Promise<boolean> {
+    const result = await saveResume(nextData, initialData);
+    if (result.ok) {
+      gooeyToast.success("Saved", { description: "resume.json committed — PDF is regenerating." });
+      return true;
+    }
+    gooeyToast.error("Save failed", { description: result.error });
+    return false;
+  }
+
   function handleSave() {
     startTransition(async () => {
-      const result = await saveResume(data, initialData);
-      if (result.ok) {
-        gooeyToast.success("Saved", {
-          description: "resume.json committed — PDF is regenerating.",
-        });
-      } else {
-        gooeyToast.error("Save failed", { description: result.error });
-      }
+      await saveNow(data);
     });
+  }
+
+  // Drive sync reads resume.json as it exists on GitHub — an unsaved local
+  // edit (e.g. a just-imported project) is invisible to it. Building the
+  // patched data explicitly here (rather than calling onChange + saveNow
+  // separately) avoids racing React's async state update: the save always
+  // includes the patch, even though setData's effect hasn't landed yet.
+  async function saveProjectPatch(index: number, patch: Partial<ProjectItem>): Promise<boolean> {
+    const nextProjects = [...data.projects];
+    nextProjects[index] = { ...nextProjects[index], ...patch };
+    const nextData = { ...data, projects: nextProjects };
+    setData(nextData);
+    return saveNow(nextData);
   }
 
   return (
@@ -145,6 +161,7 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
                   <ProjectsSection
                     items={data.projects}
                     onChange={(projects) => setData({ ...data, projects })}
+                    onSaveProjectPatch={saveProjectPatch}
                   />
                 )}
                 {activeTab === "skills" && (

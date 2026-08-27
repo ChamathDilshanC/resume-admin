@@ -13,9 +13,11 @@ const EMPTY_PROJECT: ProjectItem = { name: "", description: "", highlights: [], 
 export function ProjectsSection({
   items,
   onChange,
+  onSaveProjectPatch,
 }: {
   items: ProjectItem[];
   onChange: (items: ProjectItem[]) => void;
+  onSaveProjectPatch: (index: number, patch: Partial<ProjectItem>) => Promise<boolean>;
 }) {
   function update(i: number, patch: Partial<ProjectItem>) {
     const next = [...items];
@@ -112,7 +114,11 @@ export function ProjectsSection({
               />
             </div>
 
-            <ProjectDriveMockups project={item} onChange={(patch) => update(i, patch)} />
+            <ProjectDriveMockups
+              project={item}
+              onChange={(patch) => update(i, patch)}
+              onSaveAndSync={(patch) => onSaveProjectPatch(i, patch)}
+            />
           </div>
         )}
       />
