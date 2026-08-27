@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
-import { LogOut, HardDrive, BookOpen } from "lucide-react";
+import { LogOut, HardDrive, BookOpen, Images } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -40,6 +40,15 @@ export function NavFooter() {
             <span>Docs</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            render={<Link href="/dashboard/drive" />}
+            tooltip="Browse every project's Drive mockups in one gallery"
+          >
+            <Images className="opacity-80" />
+            <span>Project Drive</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
         {driveFileId && (
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -53,7 +62,7 @@ export function NavFooter() {
               tooltip="View the live PDF on Google Drive"
             >
               <HardDrive className="opacity-80" />
-              <span>Drive</span>
+              <span>Resume PDF</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         )}
