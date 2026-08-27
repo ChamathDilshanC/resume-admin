@@ -9,7 +9,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <TooltipProvider delay={200}>
         {children}
-        <GooeyToaster position="bottom-right" theme="light" closeButton />
+        <GooeyToaster position="top-right" theme="light" closeButton />
       </TooltipProvider>
     </SessionProvider>
   );
