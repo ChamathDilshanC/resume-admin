@@ -125,6 +125,11 @@ Copy `.env.example` to `.env.local` (for local dev) and fill in:
   `ChamathDilshanC/resume-core`
 - `RESUME_DATA_REPO_NAME` — the private repo `resume.json` itself lives in,
   defaults to `resume-data`
+- `GDRIVE_CREDENTIALS` *(optional — only needed for the "Project Drive"
+  page)* — the same Google Cloud service-account JSON key used as
+  resume-core's `GDRIVE_CREDENTIALS` secret. Copy the exact same value; this
+  app only ever reads (read-only Drive scope) — folder/file creation stays
+  resume-core's job.
 
 ### 3. Run locally
 

@@ -19,7 +19,8 @@ import {
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
 import { generateProjectHighlights, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
-import type { ResumeData, ProjectItem } from "@/lib/types";
+import { listFolderImages } from "@/lib/google-drive";
+import type { ResumeData, ProjectItem, ProjectDriveFolder, MockupCategory } from "@/lib/types";
 
 interface SessionWithToken {
   accessToken?: string;
@@ -307,6 +308,39 @@ export async function syncProjectDriveFolder(
     const accessToken = await requireAccessToken();
     await triggerDriveFolderSync(accessToken, repoFullName);
     return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export interface LiveDriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  webViewLink?: string;
+  thumbnailLink?: string;
+  category: MockupCategory;
+}
+
+// Queries Drive directly (no resume-core round-trip) so a file dropped into
+// a project's folder shows up the moment this is called — no Sync click,
+// no waiting on a workflow run. Read-only; doesn't touch resume.json.
+export async function fetchLiveDriveFiles(
+  driveFolder: Pick<ProjectDriveFolder, "mockupsFolderId" | "screenshotsFolderId" | "assetsFolderId">
+): Promise<{ ok: true; files: LiveDriveFile[] } | { ok: false; error: string }> {
+  try {
+    await requireAccessToken();
+    const [mockups, screenshots, assets] = await Promise.all([
+      listFolderImages(driveFolder.mockupsFolderId),
+      listFolderImages(driveFolder.screenshotsFolderId),
+      listFolderImages(driveFolder.assetsFolderId),
+    ]);
+    const files: LiveDriveFile[] = [
+      ...mockups.map((f) => ({ ...f, category: "mockups" as const })),
+      ...screenshots.map((f) => ({ ...f, category: "screenshots" as const })),
+      ...assets.map((f) => ({ ...f, category: "assets" as const })),
+    ];
+    return { ok: true, files };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
   }

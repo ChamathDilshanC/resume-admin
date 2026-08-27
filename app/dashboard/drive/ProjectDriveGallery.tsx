@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { gooeyToast } from "goey-toast";
 import {
@@ -11,10 +11,11 @@ import {
   RefreshCwIcon,
   SearchIcon,
   ImageOffIcon,
+  LoaderIcon,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import type { MockupCategory, ProjectItem, ProjectMockup } from "@/lib/types";
-import { syncProjectDriveFolder } from "../actions";
+import type { MockupCategory, ProjectItem } from "@/lib/types";
+import { syncProjectDriveFolder, fetchLiveDriveFiles, type LiveDriveFile } from "../actions";
 
 const CATEGORY_LABELS: Record<MockupCategory, string> = {
   mockups: "Mockups",
@@ -29,30 +30,75 @@ function largePreviewUrl(thumbnailLink: string): string {
   return thumbnailLink.replace(/=s\d+$/, "=s1600");
 }
 
-interface ProjectGroup {
-  project: ProjectItem;
-  visibleMockups: ProjectMockup[];
+interface DisplayFile {
+  id: string;
+  fileName: string;
+  thumbnailLink?: string;
+  webViewLink?: string;
+  category: MockupCategory;
+  featured: boolean;
+}
+
+type FetchState = "loading" | "loaded" | "error";
+
+function projectKey(project: ProjectItem): string {
+  return project.repoFullName || project.name;
 }
 
 export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<MockupCategory | "all">("all");
   const [syncingRepo, setSyncingRepo] = useState<string | null>(null);
-  const [preview, setPreview] = useState<ProjectMockup | null>(null);
+  const [preview, setPreview] = useState<DisplayFile | null>(null);
 
-  const groups: ProjectGroup[] = useMemo(() => {
+  const [liveFiles, setLiveFiles] = useState<Record<string, LiveDriveFile[]>>({});
+  const [fetchState, setFetchState] = useState<Record<string, FetchState>>({});
+
+  const projectsWithFolders = useMemo(() => projects.filter((p) => p.driveFolder), [projects]);
+
+  async function loadLive(project: ProjectItem) {
+    if (!project.driveFolder) return;
+    const key = projectKey(project);
+    setFetchState((prev) => ({ ...prev, [key]: "loading" }));
+    const result = await fetchLiveDriveFiles(project.driveFolder);
+    if (result.ok) {
+      setLiveFiles((prev) => ({ ...prev, [key]: result.files }));
+      setFetchState((prev) => ({ ...prev, [key]: "loaded" }));
+    } else {
+      setFetchState((prev) => ({ ...prev, [key]: "error" }));
+      gooeyToast.error(`Couldn't load ${project.name}'s Drive folder`, { description: result.error });
+    }
+  }
+
+  // Live-query every connected project's folder as soon as the page opens —
+  // no Sync click needed just to see what's already in Drive.
+  useEffect(() => {
+    projectsWithFolders.forEach((project) => {
+      loadLive(project);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectsWithFolders.map(projectKey).join(",")]);
+
+  const groups = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return projects
-      .filter((p) => p.driveFolder || (p.mockups && p.mockups.length > 0))
+    return projectsWithFolders
       .filter((p) => !query || p.name.toLowerCase().includes(query))
-      .map((project) => ({
-        project,
-        visibleMockups: (project.mockups || [])
-          .filter((m) => !m.missing)
-          .filter((m) => categoryFilter === "all" || m.category === categoryFilter)
-          .sort((a, b) => a.displayOrder - b.displayOrder),
-      }));
-  }, [projects, search, categoryFilter]);
+      .map((project) => {
+        const key = projectKey(project);
+        const mockupsByFileId = new Map((project.mockups || []).map((m) => [m.googleDriveFileId, m]));
+        const files: DisplayFile[] = (liveFiles[key] || [])
+          .filter((f) => categoryFilter === "all" || f.category === categoryFilter)
+          .map((f) => ({
+            id: f.id,
+            fileName: f.name,
+            thumbnailLink: f.thumbnailLink,
+            webViewLink: f.webViewLink,
+            category: f.category,
+            featured: mockupsByFileId.get(f.id)?.featured ?? false,
+          }));
+        return { project, files, state: fetchState[key] || "loading" };
+      });
+  }, [projectsWithFolders, liveFiles, fetchState, search, categoryFilter]);
 
   async function handleSync(project: ProjectItem) {
     const repoFullName = project.repoFullName;
@@ -66,15 +112,15 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
     const result = await syncProjectDriveFolder(repoFullName);
     setSyncingRepo(null);
     if (result.ok) {
-      gooeyToast.success("Drive sync started", {
-        description: "Runs in the background in resume-core — reload this page in a minute to see results.",
+      gooeyToast.success("Added to the Projects tab", {
+        description: "Files shown here are already live — this just makes them selectable for the portfolio (feature/reorder) on the Projects tab.",
       });
     } else {
-      gooeyToast.error("Couldn't start Drive sync", { description: result.error });
+      gooeyToast.error("Couldn't sync to Projects tab", { description: result.error });
     }
   }
 
-  const totalMockups = groups.reduce((sum, g) => sum + g.visibleMockups.length, 0);
+  const totalFiles = groups.reduce((sum, g) => sum + g.files.length, 0);
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6 lg:px-8">
@@ -95,8 +141,8 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
               Project Drive
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-gray-500">
-              Every project&rsquo;s mockups/screenshots/assets in one place, straight from the last
-              Drive sync — no need to open each project individually, or download anything to preview.
+              Live from Google Drive — opens straight to what&rsquo;s in each folder right now, no
+              syncing or downloading needed just to look.
             </p>
           </div>
         </div>
@@ -127,7 +173,7 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
             ))}
           </div>
           <span className="text-xs text-gray-400">
-            {totalMockups} file{totalMockups === 1 ? "" : "s"} across {groups.length} project
+            {totalFiles} file{totalFiles === 1 ? "" : "s"} across {groups.length} project
             {groups.length === 1 ? "" : "s"}
           </span>
         </div>
@@ -137,15 +183,15 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
             <ImageOffIcon className="h-8 w-8 text-gray-300" />
             <p className="mt-3 text-sm font-medium text-gray-600">Nothing to show yet</p>
             <p className="mt-1 max-w-sm text-xs text-gray-400">
-              Open a project on the Projects tab, create its Drive folder, add some images, then Sync
-              Mockups — it&rsquo;ll show up here.
+              Open a project on the Projects tab and create its Drive folder — it&rsquo;ll show up
+              here immediately, no sync needed just to browse.
             </p>
           </div>
         )}
 
         <div className="mt-6 space-y-8">
-          {groups.map(({ project, visibleMockups }) => (
-            <div key={project.repoFullName || project.name}>
+          {groups.map(({ project, files, state }) => (
+            <div key={projectKey(project)}>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-teal-600">
@@ -154,11 +200,20 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{project.name}</p>
                     <p className="text-xs text-gray-400">
-                      {visibleMockups.length} file{visibleMockups.length === 1 ? "" : "s"}
+                      {state === "loading" ? "Loading…" : `${files.length} file${files.length === 1 ? "" : "s"}`}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => loadLive(project)}
+                    disabled={state === "loading"}
+                    title="Refresh from Drive"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white p-1.5 text-gray-500 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RefreshCwIcon className={`h-3.5 w-3.5 ${state === "loading" ? "animate-spin" : ""}`} />
+                  </button>
                   {project.driveFolder?.webViewLink && (
                     <a
                       href={project.driveFolder.webViewLink}
@@ -173,30 +228,32 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
                     type="button"
                     onClick={() => handleSync(project)}
                     disabled={syncingRepo === project.repoFullName}
+                    title="Make these files selectable for the portfolio on the Projects tab"
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <RefreshCwIcon
-                      className={`h-3.5 w-3.5 ${syncingRepo === project.repoFullName ? "animate-spin" : ""}`}
-                    />
-                    Sync
+                    {syncingRepo === project.repoFullName ? "Syncing…" : "Sync to Projects tab"}
                   </button>
                 </div>
               </div>
 
-              {visibleMockups.length > 0 ? (
+              {state === "loading" && files.length === 0 ? (
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 bg-white px-4 py-8 text-xs text-gray-400">
+                  <LoaderIcon className="h-3.5 w-3.5 animate-spin" /> Loading from Drive…
+                </div>
+              ) : files.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {visibleMockups.map((mockup) => (
+                  {files.map((file) => (
                     <button
-                      key={mockup.id}
+                      key={file.id}
                       type="button"
-                      onClick={() => setPreview(mockup)}
+                      onClick={() => setPreview(file)}
                       className="group relative aspect-square overflow-hidden rounded-xl border border-gray-100 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-shadow hover:shadow-md"
                     >
-                      {mockup.thumbnailLink ? (
+                      {file.thumbnailLink ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={mockup.thumbnailLink}
-                          alt={mockup.fileName}
+                          src={file.thumbnailLink}
+                          alt={file.fileName}
                           className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                         />
                       ) : (
@@ -205,9 +262,9 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
                         </div>
                       )}
                       <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 text-left text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                        {mockup.fileName}
+                        {file.fileName}
                       </span>
-                      {mockup.featured && (
+                      {file.featured && (
                         <span className="absolute right-1.5 top-1.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
                           ★
                         </span>
@@ -217,9 +274,9 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
                 </div>
               ) : (
                 <p className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-6 text-center text-xs text-gray-400">
-                  {project.driveFolder
-                    ? "Folder is empty (or nothing matches this filter) — add images to it, then Sync."
-                    : "No Drive folder yet — create one from this project's detail view on the Projects tab."}
+                  {state === "error"
+                    ? "Couldn't load this folder — try the refresh button above."
+                    : "Folder is empty (or nothing matches this filter) — add images to it on Drive."}
                 </p>
               )}
             </div>
