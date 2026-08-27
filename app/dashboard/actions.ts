@@ -19,7 +19,7 @@ import {
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
 import { generateProjectHighlights, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
-import { listFolderImages } from "@/lib/google-drive";
+import { listFolderImages, uploadImageToFolder, renameFile, trashFile } from "@/lib/google-drive";
 import type { ResumeData, ProjectItem, ProjectDriveFolder, MockupCategory } from "@/lib/types";
 
 interface SessionWithToken {
@@ -341,6 +341,60 @@ export async function fetchLiveDriveFiles(
       ...assets.map((f) => ({ ...f, category: "assets" as const })),
     ];
     return { ok: true, files };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+const DRIVE_UPLOAD_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const MAX_DRIVE_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+export async function uploadDriveFile(
+  folderId: string,
+  formData: FormData
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireAccessToken();
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+      throw new Error("No file provided.");
+    }
+    if (!DRIVE_UPLOAD_MIME_TYPES.has(file.type)) {
+      throw new Error("Only PNG, JPG, or WEBP images are supported.");
+    }
+    if (file.size > MAX_DRIVE_UPLOAD_BYTES) {
+      throw new Error("Image must be smaller than 10MB.");
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await uploadImageToFolder(folderId, file.name, file.type, buffer);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function renameDriveFile(
+  fileId: string,
+  name: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireAccessToken();
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error("File name can't be empty.");
+    await renameFile(fileId, trimmed);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+// Moves the file to Drive's Bin (recoverable there), not a permanent erase.
+export async function deleteDriveFile(fileId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireAccessToken();
+    await trashFile(fileId);
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
   }

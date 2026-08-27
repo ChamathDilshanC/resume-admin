@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { google } from "googleapis";
 
 export interface DriveFile {
@@ -19,10 +20,11 @@ function getDriveClient() {
   }
   const auth = new google.auth.GoogleAuth({
     credentials: JSON.parse(credentialsJson),
-    // Read-only here — folder/file creation stays resume-core's job, using
-    // its own copy of the same service account with the broader "drive"
-    // scope. resume-admin only ever needs to look, never write.
-    scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+    // Broad "drive" scope (not drive.file) for the same reason resume-core
+    // uses it: files/folders here were shared with the service account via
+    // the ordinary Drive "Share" dialog, not created by this app, and
+    // drive.file only ever sees files the app itself created/opened.
+    scopes: ["https://www.googleapis.com/auth/drive"],
   });
   return google.drive({ version: "v3", auth });
 }
@@ -58,4 +60,42 @@ export async function listFolderImages(folderId: string): Promise<DriveFile[]> {
   } while (pageToken);
 
   return files;
+}
+
+export async function uploadImageToFolder(
+  folderId: string,
+  fileName: string,
+  mimeType: string,
+  buffer: Buffer
+): Promise<DriveFile> {
+  const drive = getDriveClient();
+  const res = await drive.files.create({
+    requestBody: { name: fileName, parents: [folderId] },
+    media: { mimeType, body: Readable.from(buffer) },
+    fields: "id, name, mimeType, webViewLink, thumbnailLink",
+  });
+  const f = res.data;
+  if (!f.id || !f.name || !f.mimeType) {
+    throw new Error("Drive upload succeeded but returned an incomplete file record.");
+  }
+  return {
+    id: f.id,
+    name: f.name,
+    mimeType: f.mimeType,
+    webViewLink: f.webViewLink ?? undefined,
+    thumbnailLink: f.thumbnailLink ?? undefined,
+  };
+}
+
+export async function renameFile(fileId: string, name: string): Promise<void> {
+  const drive = getDriveClient();
+  await drive.files.update({ fileId, requestBody: { name } });
+}
+
+// Moves to Drive's Bin rather than permanently erasing — matches what a
+// "Delete" click does in Drive's own UI, and stays recoverable from there
+// if this was a mistake.
+export async function trashFile(fileId: string): Promise<void> {
+  const drive = getDriveClient();
+  await drive.files.update({ fileId, requestBody: { trashed: true } });
 }

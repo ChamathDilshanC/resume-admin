@@ -128,8 +128,9 @@ Copy `.env.example` to `.env.local` (for local dev) and fill in:
 - `GDRIVE_CREDENTIALS` *(optional — only needed for the "Project Drive"
   page)* — the same Google Cloud service-account JSON key used as
   resume-core's `GDRIVE_CREDENTIALS` secret. Copy the exact same value; this
-  app only ever reads (read-only Drive scope) — folder/file creation stays
-  resume-core's job.
+  app can upload/rename/delete files inside a project's Drive folder, but
+  never creates the folder itself — that's still resume-core's job, via the
+  Sync workflow.
 
 ### 3. Run locally
 
