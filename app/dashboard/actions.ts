@@ -6,6 +6,7 @@ import {
   fetchResumeJson,
   saveResumeJson,
   triggerPdfRegeneration,
+  triggerDriveFolderSync,
   uploadAsset,
   fetchAsset,
   extensionOf,
@@ -220,7 +221,7 @@ export async function generateProjectFromGithubRepo(
     const accessToken = await requireAccessToken();
     const owner = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
 
-    const { name, description, url, techStack } = await fetchProjectTechStack(
+    const { name, description, url, techStack, repoFullName } = await fetchProjectTechStack(
       accessToken,
       owner,
       repoName
@@ -243,9 +244,26 @@ export async function generateProjectFromGithubRepo(
       description,
       highlights,
       links: [{ label: name, url }],
+      repoFullName,
+      repositoryType: "MAIN",
     };
 
     return { ok: true, project };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+// Kicks off resume-core's sync-drive-mockups.yml for one project (or, with
+// no repoFullName, every eligible project). The workflow runs async and
+// commits results back to resume.json — this call only starts it.
+export async function syncProjectDriveFolder(
+  repoFullName?: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const accessToken = await requireAccessToken();
+    await triggerDriveFolderSync(accessToken, repoFullName);
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
   }

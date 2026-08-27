@@ -6,6 +6,7 @@ import { FolderIcon, TrashIcon, PlusIcon } from "@/components/icons";
 import type { ProjectItem } from "@/lib/types";
 import { AddProjectMenu } from "./AddProjectMenu";
 import { ProjectPriorityModal } from "./ProjectPriorityModal";
+import { ProjectDriveMockups } from "./ProjectDriveMockups";
 
 const EMPTY_PROJECT: ProjectItem = { name: "", description: "", highlights: [], links: [] };
 
@@ -110,6 +111,8 @@ export function ProjectsSection({
                 onChange={(v) => update(i, { highlights: v })}
               />
             </div>
+
+            <ProjectDriveMockups project={item} onChange={(patch) => update(i, patch)} />
           </div>
         )}
       />

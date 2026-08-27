@@ -9,6 +9,7 @@ const REPO_NAME = process.env.RESUME_REPO_NAME || "resume-core";
 const DATA_REPO_NAME = process.env.RESUME_DATA_REPO_NAME || "resume-data";
 const RESUME_PATH = "resume.json";
 const PDF_WORKFLOW_FILE = "regenerate-pdf.yml";
+const DRIVE_SYNC_WORKFLOW_FILE = "sync-drive-mockups.yml";
 
 function client(accessToken: string) {
   return new Octokit({ auth: accessToken });
@@ -56,6 +57,20 @@ export async function triggerPdfRegeneration(accessToken: string): Promise<void>
     repo: REPO_NAME,
     workflow_id: PDF_WORKFLOW_FILE,
     ref: "main",
+  });
+}
+
+// Creates/reuses a project's Drive folder and (re-)scans its mockup images.
+// Runs async in resume-core — this only kicks it off, same fire-and-forget
+// pattern as triggerPdfRegeneration. Omit repoFullName to sync every project.
+export async function triggerDriveFolderSync(accessToken: string, repoFullName?: string): Promise<void> {
+  const octokit = client(accessToken);
+  await octokit.actions.createWorkflowDispatch({
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
+    workflow_id: DRIVE_SYNC_WORKFLOW_FILE,
+    ref: "main",
+    inputs: repoFullName ? { repo_full_name: repoFullName } : {},
   });
 }
 
@@ -257,7 +272,7 @@ export async function fetchProjectTechStack(
   accessToken: string,
   owner: string,
   repo: string
-): Promise<{ name: string; description: string; url: string; techStack: string }> {
+): Promise<{ name: string; description: string; url: string; techStack: string; repoFullName: string }> {
   const octokit = client(accessToken);
 
   const { data: repoDetails } = await octokit.repos.get({ owner, repo });
@@ -281,5 +296,6 @@ export async function fetchProjectTechStack(
     description: repoDetails.description || "",
     url: repoDetails.html_url,
     techStack: [...languageSet].join(", "),
+    repoFullName: repoDetails.full_name,
   };
 }
