@@ -113,7 +113,28 @@ this step can't be automated:
 5. Create the app, then **Generate a new client secret**
 6. Copy the **Client ID** and **Client Secret** — you'll need both below
 
-### 2. Environment variables
+### 2. Create a Google OAuth Client (optional — only for uploading via "Project Drive")
+
+Only needed if you want the "Project Drive" page's **Upload** button to
+work. Browsing, renaming, and deleting files there use resume-core's
+existing Drive service account and don't need this — but a service account
+has zero storage quota on a normal (non-Workspace) Drive, so it can never
+own a newly-created file. Uploads instead run as you, the real account
+owner, via a one-time "Connect Google Drive" link.
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) →
+   the **same project** that owns resume-core's service account →
+   **Create Credentials → OAuth client ID**
+2. If prompted, configure the **OAuth consent screen** first: User type
+   **External**, fill in the required fields, and leave it in **Testing**
+   mode — add your own Google account under **Test users**. (Publishing
+   isn't needed since only you will ever use this.)
+3. Application type: **Web application**
+4. **Authorized redirect URIs:** `<your deployed URL>/api/auth/callback/google`
+   (and `http://localhost:3000/api/auth/callback/google` for local dev)
+5. Create it, then copy the **Client ID** and **Client Secret**
+
+### 3. Environment variables
 
 Copy `.env.example` to `.env.local` (for local dev) and fill in:
 
@@ -128,11 +149,16 @@ Copy `.env.example` to `.env.local` (for local dev) and fill in:
 - `GDRIVE_CREDENTIALS` *(optional — only needed for the "Project Drive"
   page)* — the same Google Cloud service-account JSON key used as
   resume-core's `GDRIVE_CREDENTIALS` secret. Copy the exact same value; this
-  app can upload/rename/delete files inside a project's Drive folder, but
-  never creates the folder itself — that's still resume-core's job, via the
-  Sync workflow.
+  app can browse/rename/delete files inside a project's Drive folder, but
+  never creates the folder itself (still resume-core's job) and can't
+  upload new files (see below).
+- `GOOGLE_DRIVE_OAUTH_CLIENT_ID` / `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET`
+  *(optional — only needed to upload via "Project Drive")* — from step 2
+- `ALLOWED_GOOGLE_EMAIL` *(required if the above two are set)* — the only
+  Google account allowed to complete "Connect Google Drive"; every other
+  Google sign-in attempt is rejected
 
-### 3. Run locally
+### 4. Run locally
 
 ```bash
 npm install
@@ -142,15 +168,16 @@ npm run dev
 Visit `http://localhost:3000`, sign in with GitHub, and you should land on
 the dashboard.
 
-### 4. Deploy to Vercel
+### 5. Deploy to Vercel
 
 ```bash
 vercel
 ```
 
 Or connect the GitHub repo in the Vercel dashboard. Either way, set the same
-environment variables from step 2 in the Vercel project settings (with
-`NEXTAUTH_URL` and the OAuth App's callback URL updated to the real domain).
+environment variables from step 3 in the Vercel project settings (with
+`NEXTAUTH_URL` and both OAuth apps' callback URLs — GitHub's and, if
+configured, Google's — updated to the real domain).
 
 ## Security notes
 

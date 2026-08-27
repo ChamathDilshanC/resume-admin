@@ -6,17 +6,25 @@ import { ProjectDriveGallery } from "./ProjectDriveGallery";
 
 interface SessionWithToken {
   accessToken?: string;
+  googleDriveConnected?: boolean;
+  googleDriveError?: boolean;
 }
 
 export default async function DrivePage() {
   const session = await getServerSession(authOptions);
-  const accessToken = (session as unknown as SessionWithToken | null)?.accessToken;
+  const s = session as unknown as SessionWithToken | null;
 
-  if (!session || !accessToken) {
+  if (!session || !s?.accessToken) {
     redirect("/signin");
   }
 
-  const { data } = await fetchResumeJson(accessToken);
+  const { data } = await fetchResumeJson(s.accessToken);
 
-  return <ProjectDriveGallery projects={data.projects} />;
+  return (
+    <ProjectDriveGallery
+      projects={data.projects}
+      googleDriveConnected={Boolean(s.googleDriveConnected)}
+      googleDriveError={Boolean(s.googleDriveError)}
+    />
+  );
 }

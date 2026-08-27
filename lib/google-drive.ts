@@ -1,5 +1,5 @@
 import { Readable } from "node:stream";
-import { google } from "googleapis";
+import { google, type drive_v3 } from "googleapis";
 
 export interface DriveFile {
   id: string;
@@ -13,7 +13,10 @@ export interface DriveFile {
 // resume-core/scripts/lib/google-drive.js's SUPPORTED_MIME_TYPES.
 const SUPPORTED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
-function getDriveClient() {
+// Service-account client: used for everything that doesn't create new file
+// content (listing, rename, trash) — none of that needs storage quota, so
+// the service account (which has none of its own) handles it fine.
+function getServiceAccountDriveClient(): drive_v3.Drive {
   const credentialsJson = process.env.GDRIVE_CREDENTIALS;
   if (!credentialsJson) {
     throw new Error("GDRIVE_CREDENTIALS is not configured on resume-admin.");
@@ -29,12 +32,23 @@ function getDriveClient() {
   return google.drive({ version: "v3", auth });
 }
 
+// User-OAuth client: the only one that can create new file *content*. A
+// service account has zero storage quota on a normal (non-Workspace)
+// account and 403s on files.create — uploads have to run as the real
+// account owner instead, using the access token from their linked Google
+// sign-in (see lib/auth.ts's Google provider).
+function getUserDriveClient(accessToken: string): drive_v3.Drive {
+  const auth = new google.auth.OAuth2();
+  auth.setCredentials({ access_token: accessToken });
+  return google.drive({ version: "v3", auth });
+}
+
 // Live, on-demand listing — no sync step, no wait. Used by the Project
 // Drive gallery so a file dropped into Drive shows up the moment the page
 // is opened/refreshed, instead of only after resume-core's background sync
 // workflow has run and committed resume.json.
 export async function listFolderImages(folderId: string): Promise<DriveFile[]> {
-  const drive = getDriveClient();
+  const drive = getServiceAccountDriveClient();
   const files: DriveFile[] = [];
   let pageToken: string | undefined;
 
@@ -62,13 +76,16 @@ export async function listFolderImages(folderId: string): Promise<DriveFile[]> {
   return files;
 }
 
+// Requires a real user's OAuth access token (not the service account) —
+// see getUserDriveClient's comment above for why.
 export async function uploadImageToFolder(
+  accessToken: string,
   folderId: string,
   fileName: string,
   mimeType: string,
   buffer: Buffer
 ): Promise<DriveFile> {
-  const drive = getDriveClient();
+  const drive = getUserDriveClient(accessToken);
   const res = await drive.files.create({
     requestBody: { name: fileName, parents: [folderId] },
     media: { mimeType, body: Readable.from(buffer) },
@@ -88,7 +105,7 @@ export async function uploadImageToFolder(
 }
 
 export async function renameFile(fileId: string, name: string): Promise<void> {
-  const drive = getDriveClient();
+  const drive = getServiceAccountDriveClient();
   await drive.files.update({ fileId, requestBody: { name } });
 }
 
@@ -96,6 +113,6 @@ export async function renameFile(fileId: string, name: string): Promise<void> {
 // "Delete" click does in Drive's own UI, and stays recoverable from there
 // if this was a mistake.
 export async function trashFile(fileId: string): Promise<void> {
-  const drive = getDriveClient();
+  const drive = getServiceAccountDriveClient();
   await drive.files.update({ fileId, requestBody: { trashed: true } });
 }

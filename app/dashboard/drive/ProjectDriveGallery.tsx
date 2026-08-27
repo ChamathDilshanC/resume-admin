@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { signIn } from "next-auth/react";
 import { gooeyToast } from "goey-toast";
 import {
   FolderOpenIcon,
@@ -16,6 +17,7 @@ import {
   TrashIcon,
   PencilIcon,
   CheckIcon,
+  CloudIcon,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { MockupCategory, ProjectDriveFolder, ProjectItem } from "@/lib/types";
@@ -67,7 +69,15 @@ function projectKey(project: ProjectItem): string {
   return project.repoFullName || project.name;
 }
 
-export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
+export function ProjectDriveGallery({
+  projects,
+  googleDriveConnected,
+  googleDriveError,
+}: {
+  projects: ProjectItem[];
+  googleDriveConnected: boolean;
+  googleDriveError: boolean;
+}) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<MockupCategory | "all">("all");
   const [syncingRepo, setSyncingRepo] = useState<string | null>(null);
@@ -148,6 +158,10 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
 
   function uploadCategory(): MockupCategory {
     return categoryFilter === "all" ? "mockups" : categoryFilter;
+  }
+
+  function handleConnectGoogle() {
+    signIn("google", { callbackUrl: "/dashboard/drive" });
   }
 
   async function handleUpload(project: ProjectItem, file: File | undefined) {
@@ -245,6 +259,26 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
           </div>
         </div>
 
+        {(!googleDriveConnected || googleDriveError) && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-center gap-2.5 text-sm text-amber-800">
+              <CloudIcon className="h-4 w-4 shrink-0" />
+              <span>
+                {googleDriveError
+                  ? "Your Google Drive connection expired — reconnect to keep uploading."
+                  : "Connect your Google Drive account to upload files here (browsing, rename, and delete already work without it)."}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleConnectGoogle}
+              className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
+            >
+              {googleDriveError ? "Reconnect Google Drive" : "Connect Google Drive"}
+            </button>
+          </div>
+        )}
+
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px] max-w-sm">
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -329,9 +363,17 @@ export function ProjectDriveGallery({ projects }: { projects: ProjectItem[] }) {
                     />
                     <button
                       type="button"
-                      onClick={() => fileInputRefs.current[key]?.click()}
+                      onClick={() =>
+                        googleDriveConnected && !googleDriveError
+                          ? fileInputRefs.current[key]?.click()
+                          : handleConnectGoogle()
+                      }
                       disabled={uploadingKey === key}
-                      title={`Upload to ${CATEGORY_LABELS[uploadCategory()]}`}
+                      title={
+                        googleDriveConnected && !googleDriveError
+                          ? `Upload to ${CATEGORY_LABELS[uploadCategory()]}`
+                          : "Connect Google Drive to upload"
+                      }
                       className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <UploadIcon className={`h-3.5 w-3.5 ${uploadingKey === key ? "animate-pulse" : ""}`} />

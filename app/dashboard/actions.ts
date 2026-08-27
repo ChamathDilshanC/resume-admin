@@ -24,6 +24,9 @@ import type { ResumeData, ProjectItem, ProjectDriveFolder, MockupCategory } from
 
 interface SessionWithToken {
   accessToken?: string;
+  googleAccessToken?: string;
+  googleDriveConnected?: boolean;
+  googleDriveError?: boolean;
 }
 
 async function requireAccessToken(): Promise<string> {
@@ -33,6 +36,29 @@ async function requireAccessToken(): Promise<string> {
     throw new Error("Not authenticated.");
   }
   return accessToken;
+}
+
+// A service account can't own new file content (see lib/google-drive.ts) —
+// uploads run as the real account owner via a linked Google sign-in
+// instead. Distinct from requireAccessToken (GitHub), which every action
+// still needs first as the actual identity gate.
+async function requireGoogleAccessToken(): Promise<string> {
+  await requireAccessToken();
+  const session = await getServerSession(authOptions);
+  const s = session as unknown as SessionWithToken | null;
+  if (s?.googleDriveError) {
+    throw new Error("Google Drive connection expired — click \"Connect Google Drive\" to reconnect.");
+  }
+  if (!s?.googleDriveConnected || !s.googleAccessToken) {
+    throw new Error("Google Drive isn't connected yet — click \"Connect Google Drive\" first.");
+  }
+  return s.googleAccessToken;
+}
+
+export async function getGoogleDriveConnectionStatus(): Promise<{ connected: boolean; error: boolean }> {
+  const session = await getServerSession(authOptions);
+  const s = session as unknown as SessionWithToken | null;
+  return { connected: Boolean(s?.googleDriveConnected), error: Boolean(s?.googleDriveError) };
 }
 
 // This browser tab holds its own copy of resume.json from whenever the
@@ -354,7 +380,7 @@ export async function uploadDriveFile(
   formData: FormData
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    await requireAccessToken();
+    const googleAccessToken = await requireGoogleAccessToken();
     const file = formData.get("file");
     if (!(file instanceof File)) {
       throw new Error("No file provided.");
@@ -367,7 +393,7 @@ export async function uploadDriveFile(
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    await uploadImageToFolder(folderId, file.name, file.type, buffer);
+    await uploadImageToFolder(googleAccessToken, folderId, file.name, file.type, buffer);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
