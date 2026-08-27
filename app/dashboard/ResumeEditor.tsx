@@ -75,10 +75,13 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
 
   const navItems = buildNavItems(data);
 
-  async function saveNow(nextData: ResumeData): Promise<boolean> {
-    const result = await saveResume(nextData, initialData);
+  async function saveNow(nextData: ResumeData, options: { regeneratePdf?: boolean } = {}): Promise<boolean> {
+    const { regeneratePdf = true } = options;
+    const result = await saveResume(nextData, initialData, { regeneratePdf });
     if (result.ok) {
-      gooeyToast.success("Saved", { description: "resume.json committed — PDF is regenerating." });
+      gooeyToast.success("Saved", {
+        description: regeneratePdf ? "resume.json committed — PDF is regenerating." : "resume.json committed.",
+      });
       return true;
     }
     gooeyToast.error("Save failed", { description: result.error });
@@ -101,7 +104,10 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
     nextProjects[index] = { ...nextProjects[index], ...patch };
     const nextData = { ...data, projects: nextProjects };
     setData(nextData);
-    return saveNow(nextData);
+    // This save exists purely to make sure resume-core's sync workflow has
+    // something to read — it isn't a content edit the rendered PDF needs to
+    // reflect, so don't fire off (and queue behind) a PDF regeneration too.
+    return saveNow(nextData, { regeneratePdf: false });
   }
 
   return (

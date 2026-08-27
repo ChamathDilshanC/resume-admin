@@ -49,10 +49,47 @@ function pickChanged<K extends keyof ResumeData>(
   return JSON.stringify(current[key]) === JSON.stringify(initial[key]) ? remote[key] : current[key];
 }
 
+// pickChanged("projects", ...) protects the whole array: if this tab edited
+// ANY project this session, the whole array it's holding wins over remote.
+// But driveFolder/mockups are written by resume-core's background sync
+// workflow, entirely outside this tab — a save that only meant to edit, say,
+// a project's description (or just re-saved to unblock a Drive sync click)
+// would otherwise silently ship this tab's stale (missing/older)
+// driveFolder+mockups and clobber whatever the workflow already committed.
+// So: per project, if THIS tab never touched that project's driveFolder/
+// mockups since load, take remote's copy of just those two fields —
+// regardless of what pickChanged decided for the rest of the array.
+function reconcileProjectDriveFields(
+  projects: ProjectItem[],
+  initialProjects: ProjectItem[],
+  remoteProjects: ProjectItem[]
+): ProjectItem[] {
+  const keyOf = (p: ProjectItem) => p.repoFullName || p.name;
+  const initialByKey = new Map(initialProjects.map((p) => [keyOf(p), p]));
+  const remoteByKey = new Map(remoteProjects.map((p) => [keyOf(p), p]));
+
+  return projects.map((project) => {
+    const key = keyOf(project);
+    const initial = initialByKey.get(key);
+    const remote = remoteByKey.get(key);
+    if (!remote) return project; // brand new locally — nothing remote to reconcile against
+
+    const untouchedThisSession =
+      JSON.stringify(project.driveFolder) === JSON.stringify(initial?.driveFolder) &&
+      JSON.stringify(project.mockups) === JSON.stringify(initial?.mockups);
+
+    if (!untouchedThisSession) return project; // user edited mockups/folder in this tab — keep it
+
+    return { ...project, driveFolder: remote.driveFolder, mockups: remote.mockups };
+  });
+}
+
 export async function saveResume(
   data: ResumeData,
-  initialData: ResumeData
+  initialData: ResumeData,
+  options: { regeneratePdf?: boolean } = {}
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { regeneratePdf = true } = options;
   try {
     const accessToken = await requireAccessToken();
     const { data: remote, sha } = await fetchResumeJson(accessToken);
@@ -62,14 +99,20 @@ export async function saveResume(
       basics: pickChanged("basics", data, initialData, remote),
       work: pickChanged("work", data, initialData, remote),
       skills: pickChanged("skills", data, initialData, remote),
-      projects: pickChanged("projects", data, initialData, remote),
+      projects: reconcileProjectDriveFields(
+        pickChanged("projects", data, initialData, remote),
+        initialData.projects,
+        remote.projects
+      ),
       certificates: pickChanged("certificates", data, initialData, remote),
       education: pickChanged("education", data, initialData, remote),
       references: pickChanged("references", data, initialData, remote),
     };
 
     await saveResumeJson(accessToken, merged, sha, "chore: update resume content via resume-admin");
-    await triggerPdfRegeneration(accessToken);
+    if (regeneratePdf) {
+      await triggerPdfRegeneration(accessToken);
+    }
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
