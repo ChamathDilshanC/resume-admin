@@ -14,6 +14,7 @@ import {
 import { IconButton } from "@/components/FormControls";
 import { TrashIcon } from "@/components/icons";
 import type { ProjectItem, ProjectMockup } from "@/lib/types";
+import { deriveRepoFullNameFromLinks } from "@/lib/project-links";
 import { syncProjectDriveFolder } from "../actions";
 
 export function ProjectDriveMockups({
@@ -27,15 +28,24 @@ export function ProjectDriveMockups({
   const mockups = project.mockups || [];
   const orderedMockups = [...mockups].sort((a, b) => a.displayOrder - b.displayOrder);
 
+  // Projects created before repoFullName existed still have a GitHub URL in
+  // their links — recover it from there instead of forcing a re-import.
+  const linkedRepoFullName = project.repoFullName || deriveRepoFullNameFromLinks(project.links);
+
   async function handleSync() {
-    if (!project.repoFullName) {
+    if (!linkedRepoFullName) {
       gooeyToast.error("No GitHub repository linked", {
-        description: "Only projects added via \"Import from GitHub\" can have a Drive folder.",
+        description: "Add a GitHub link to this project, or re-add it via \"Import from GitHub\".",
       });
       return;
     }
+    // Persist the recovered link so it's stored going forward, not
+    // re-derived from links every time.
+    if (!project.repoFullName) {
+      onChange({ repoFullName: linkedRepoFullName, repositoryType: project.repositoryType ?? "MAIN" });
+    }
     setSyncing(true);
-    const result = await syncProjectDriveFolder(project.repoFullName);
+    const result = await syncProjectDriveFolder(linkedRepoFullName);
     setSyncing(false);
     if (result.ok) {
       gooeyToast.success("Drive sync started", {
@@ -89,10 +99,10 @@ export function ProjectDriveMockups({
         </div>
       </div>
 
-      {!project.repoFullName ? (
+      {!linkedRepoFullName ? (
         <p className="text-xs text-amber-600">
-          Not linked to a GitHub repository — only projects added via &ldquo;Import from GitHub&rdquo; can have a
-          Drive folder.
+          Not linked to a GitHub repository — add a GitHub link above, or re-add this project via &ldquo;Import
+          from GitHub&rdquo;, to enable a Drive folder.
         </p>
       ) : project.driveFolder ? (
         <p className="text-xs text-gray-500">
@@ -101,7 +111,12 @@ export function ProjectDriveMockups({
           <code className="rounded bg-gray-100 px-1 py-0.5">assets</code> subfolder on Drive, then Sync Mockups.
         </p>
       ) : (
-        <p className="text-xs text-gray-500">No Drive folder yet — create one to start adding mockups.</p>
+        <p className="text-xs text-gray-500">
+          {!project.repoFullName && (
+            <>Linked via GitHub URL in Links (<code className="rounded bg-gray-100 px-1 py-0.5">{linkedRepoFullName}</code>). </>
+          )}
+          No Drive folder yet — create one to start adding mockups.
+        </p>
       )}
 
       {mockups.length > 0 && (
