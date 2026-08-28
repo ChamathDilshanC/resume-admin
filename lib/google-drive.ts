@@ -104,15 +104,42 @@ export async function uploadImageToFolder(
   };
 }
 
-export async function renameFile(fileId: string, name: string): Promise<void> {
-  const drive = getServiceAccountDriveClient();
-  await drive.files.update({ fileId, requestBody: { name } });
+function isPermissionError(error: unknown): boolean {
+  const code = (error as { code?: number | string })?.code;
+  return Number(code) === 403;
+}
+
+// The service account owns files/folders that resume-core's pipeline
+// created, but not ones a real person dragged straight into Drive (or that
+// this app uploaded via uploadImageToFolder, which has to run as the user
+// for the quota reason above) — Drive only lets the *owner* update those,
+// so the service account 403s on them. When that happens and the caller has
+// a Google Drive access token for the signed-in user, retry as them: as the
+// owner (or as someone with inherited access from the real folder owner)
+// they can do what the service account can't.
+async function withOwnerFallback<T>(
+  fallbackAccessToken: string | undefined,
+  run: (drive: drive_v3.Drive) => Promise<T>
+): Promise<T> {
+  try {
+    return await run(getServiceAccountDriveClient());
+  } catch (error) {
+    if (!fallbackAccessToken || !isPermissionError(error)) throw error;
+    return run(getUserDriveClient(fallbackAccessToken));
+  }
+}
+
+export async function renameFile(fileId: string, name: string, fallbackAccessToken?: string): Promise<void> {
+  await withOwnerFallback(fallbackAccessToken, (drive) =>
+    drive.files.update({ fileId, requestBody: { name } })
+  );
 }
 
 // Moves to Drive's Bin rather than permanently erasing — matches what a
 // "Delete" click does in Drive's own UI, and stays recoverable from there
 // if this was a mistake.
-export async function trashFile(fileId: string): Promise<void> {
-  const drive = getServiceAccountDriveClient();
-  await drive.files.update({ fileId, requestBody: { trashed: true } });
+export async function trashFile(fileId: string, fallbackAccessToken?: string): Promise<void> {
+  await withOwnerFallback(fallbackAccessToken, (drive) =>
+    drive.files.update({ fileId, requestBody: { trashed: true } })
+  );
 }

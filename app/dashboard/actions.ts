@@ -66,6 +66,17 @@ async function requireGoogleAccessToken(): Promise<string> {
   }
 }
 
+// Same as requireGoogleAccessToken, but returns null instead of throwing —
+// for callers (rename/delete) that can fall back to the service account and
+// only need this as a bonus when the connection happens to be there.
+async function tryGetGoogleAccessToken(): Promise<string | null> {
+  try {
+    return await requireGoogleAccessToken();
+  } catch {
+    return null;
+  }
+}
+
 export async function getGoogleDriveConnectionStatus(): Promise<{ connected: boolean }> {
   const cookieStore = await cookies();
   return { connected: Boolean(cookieStore.get(GOOGLE_DRIVE_COOKIE)?.value) };
@@ -418,7 +429,7 @@ export async function renameDriveFile(
     await requireAccessToken();
     const trimmed = name.trim();
     if (!trimmed) throw new Error("File name can't be empty.");
-    await renameFile(fileId, trimmed);
+    await renameFile(fileId, trimmed, (await tryGetGoogleAccessToken()) ?? undefined);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
@@ -429,7 +440,7 @@ export async function renameDriveFile(
 export async function deleteDriveFile(fileId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await requireAccessToken();
-    await trashFile(fileId);
+    await trashFile(fileId, (await tryGetGoogleAccessToken()) ?? undefined);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
