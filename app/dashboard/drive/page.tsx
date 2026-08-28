@@ -1,30 +1,31 @@
+import { Suspense } from "react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { fetchResumeJson } from "@/lib/github";
+import { getGoogleDriveConnectionStatus } from "../actions";
 import { ProjectDriveGallery } from "./ProjectDriveGallery";
 
 interface SessionWithToken {
   accessToken?: string;
-  googleDriveConnected?: boolean;
-  googleDriveError?: boolean;
 }
 
 export default async function DrivePage() {
   const session = await getServerSession(authOptions);
-  const s = session as unknown as SessionWithToken | null;
+  const accessToken = (session as unknown as SessionWithToken | null)?.accessToken;
 
-  if (!session || !s?.accessToken) {
+  if (!session || !accessToken) {
     redirect("/signin");
   }
 
-  const { data } = await fetchResumeJson(s.accessToken);
+  const [{ data }, { connected }] = await Promise.all([
+    fetchResumeJson(accessToken),
+    getGoogleDriveConnectionStatus(),
+  ]);
 
   return (
-    <ProjectDriveGallery
-      projects={data.projects}
-      googleDriveConnected={Boolean(s.googleDriveConnected)}
-      googleDriveError={Boolean(s.googleDriveError)}
-    />
+    <Suspense>
+      <ProjectDriveGallery projects={data.projects} googleDriveConnected={connected} />
+    </Suspense>
   );
 }

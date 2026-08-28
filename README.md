@@ -122,6 +122,16 @@ has zero storage quota on a normal (non-Workspace) Drive, so it can never
 own a newly-created file. Uploads instead run as you, the real account
 owner, via a one-time "Connect Google Drive" link.
 
+This is deliberately **not** wired through NextAuth — an earlier version
+added Google as a second NextAuth provider and linked it onto the existing
+session's JWT, which packed a GitHub token *and* Google access+refresh
+tokens into one cookie and occasionally pushed it past the browser's ~4KB
+cookie limit, breaking login itself with an infinite `/signin` redirect
+loop. The refresh token instead lives in its own small, separate,
+encrypted cookie (`google_drive_refresh_token`), issued by
+`/api/drive-auth/callback` — completely isolated from the login session
+that `middleware.ts` checks on every `/dashboard` request.
+
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) →
    the **same project** that owns resume-core's service account →
    **Create Credentials → OAuth client ID**
@@ -130,8 +140,10 @@ owner, via a one-time "Connect Google Drive" link.
    mode — add your own Google account under **Test users**. (Publishing
    isn't needed since only you will ever use this.)
 3. Application type: **Web application**
-4. **Authorized redirect URIs:** `<your deployed URL>/api/auth/callback/google`
-   (and `http://localhost:3000/api/auth/callback/google` for local dev)
+4. **Authorized redirect URIs:** `<your deployed URL>/api/drive-auth/callback`
+   (and `http://localhost:3000/api/drive-auth/callback` for local dev) —
+   note this is *not* `/api/auth/callback/google`, since this flow doesn't
+   go through NextAuth
 5. Create it, then copy the **Client ID** and **Client Secret**
 
 ### 3. Environment variables

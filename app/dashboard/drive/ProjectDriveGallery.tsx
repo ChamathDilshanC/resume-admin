@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { gooeyToast } from "goey-toast";
 import {
   FolderOpenIcon,
@@ -69,15 +69,22 @@ function projectKey(project: ProjectItem): string {
   return project.repoFullName || project.name;
 }
 
+const DRIVE_ERROR_MESSAGES: Record<string, string> = {
+  not_allowed: "That Google account isn't the one this app is configured to allow (ALLOWED_GOOGLE_EMAIL).",
+  missing_code: "Google didn't return an authorization code — try again.",
+  exchange_failed: "Couldn't complete the connection with Google — try again.",
+  access_denied: "You declined the Google consent screen.",
+};
+
 export function ProjectDriveGallery({
   projects,
   googleDriveConnected,
-  googleDriveError,
 }: {
   projects: ProjectItem[];
   googleDriveConnected: boolean;
-  googleDriveError: boolean;
 }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<MockupCategory | "all">("all");
   const [syncingRepo, setSyncingRepo] = useState<string | null>(null);
@@ -91,6 +98,19 @@ export function ProjectDriveGallery({
   const [fetchState, setFetchState] = useState<Record<string, FetchState>>({});
 
   const projectsWithFolders = useMemo(() => projects.filter((p) => p.driveFolder), [projects]);
+
+  // /api/drive-auth/callback redirects back here with ?drive_error=... on
+  // failure (never on success — a fresh server render already reflects a
+  // successful connection). Surface it once, then clean the URL.
+  useEffect(() => {
+    const errorCode = searchParams.get("drive_error");
+    if (!errorCode) return;
+    gooeyToast.error("Couldn't connect Google Drive", {
+      description: DRIVE_ERROR_MESSAGES[errorCode] || errorCode,
+    });
+    router.replace("/dashboard/drive");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   async function loadLive(project: ProjectItem) {
     if (!project.driveFolder) return;
@@ -161,7 +181,7 @@ export function ProjectDriveGallery({
   }
 
   function handleConnectGoogle() {
-    signIn("google", { callbackUrl: "/dashboard/drive" });
+    window.location.href = "/api/drive-auth/connect";
   }
 
   async function handleUpload(project: ProjectItem, file: File | undefined) {
@@ -259,14 +279,13 @@ export function ProjectDriveGallery({
           </div>
         </div>
 
-        {(!googleDriveConnected || googleDriveError) && (
+        {!googleDriveConnected ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <div className="flex items-center gap-2.5 text-sm text-amber-800">
               <CloudIcon className="h-4 w-4 shrink-0" />
               <span>
-                {googleDriveError
-                  ? "Your Google Drive connection expired — reconnect to keep uploading."
-                  : "Connect your Google Drive account to upload files here (browsing, rename, and delete already work without it)."}
+                Connect your Google Drive account to upload files here (browsing, rename, and delete
+                already work without it).
               </span>
             </div>
             <button
@@ -274,8 +293,16 @@ export function ProjectDriveGallery({
               onClick={handleConnectGoogle}
               className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
             >
-              {googleDriveError ? "Reconnect Google Drive" : "Connect Google Drive"}
+              Connect Google Drive
             </button>
+          </div>
+        ) : (
+          <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
+            <CloudIcon className="h-3.5 w-3.5" />
+            Google Drive connected for uploads.{" "}
+            <a href="/api/drive-auth/disconnect" className="font-medium text-gray-500 underline hover:text-gray-700">
+              Disconnect
+            </a>
           </div>
         )}
 
@@ -364,13 +391,11 @@ export function ProjectDriveGallery({
                     <button
                       type="button"
                       onClick={() =>
-                        googleDriveConnected && !googleDriveError
-                          ? fileInputRefs.current[key]?.click()
-                          : handleConnectGoogle()
+                        googleDriveConnected ? fileInputRefs.current[key]?.click() : handleConnectGoogle()
                       }
                       disabled={uploadingKey === key}
                       title={
-                        googleDriveConnected && !googleDriveError
+                        googleDriveConnected
                           ? `Upload to ${CATEGORY_LABELS[uploadCategory()]}`
                           : "Connect Google Drive to upload"
                       }

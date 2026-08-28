@@ -1,6 +1,7 @@
 "use server";
 
 import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
 import {
   fetchResumeJson,
@@ -20,14 +21,15 @@ import {
 import { renderTemplatePreview } from "@/lib/preview";
 import { generateProjectHighlights, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
 import { listFolderImages, uploadImageToFolder, renameFile, trashFile } from "@/lib/google-drive";
+import { getFreshAccessToken } from "@/lib/google-drive-oauth";
+import { decrypt } from "@/lib/crypto";
 import type { ResumeData, ProjectItem, ProjectDriveFolder, MockupCategory } from "@/lib/types";
 
 interface SessionWithToken {
   accessToken?: string;
-  googleAccessToken?: string;
-  googleDriveConnected?: boolean;
-  googleDriveError?: boolean;
 }
+
+const GOOGLE_DRIVE_COOKIE = "google_drive_refresh_token";
 
 async function requireAccessToken(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -39,26 +41,34 @@ async function requireAccessToken(): Promise<string> {
 }
 
 // A service account can't own new file content (see lib/google-drive.ts) —
-// uploads run as the real account owner via a linked Google sign-in
-// instead. Distinct from requireAccessToken (GitHub), which every action
-// still needs first as the actual identity gate.
+// uploads run as the real account owner instead, via a refresh token from
+// the isolated /api/drive-auth flow, kept in its own cookie entirely
+// separate from NextAuth's session (see lib/google-drive-oauth.ts's
+// comment for why: stacking this onto the main session JWT overflowed the
+// browser's cookie size limit and broke login itself).
 async function requireGoogleAccessToken(): Promise<string> {
   await requireAccessToken();
-  const session = await getServerSession(authOptions);
-  const s = session as unknown as SessionWithToken | null;
-  if (s?.googleDriveError) {
-    throw new Error("Google Drive connection expired — click \"Connect Google Drive\" to reconnect.");
-  }
-  if (!s?.googleDriveConnected || !s.googleAccessToken) {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(GOOGLE_DRIVE_COOKIE)?.value;
+  if (!raw) {
     throw new Error("Google Drive isn't connected yet — click \"Connect Google Drive\" first.");
   }
-  return s.googleAccessToken;
+  let refreshToken: string;
+  try {
+    refreshToken = decrypt(raw);
+  } catch {
+    throw new Error("Google Drive connection is invalid — click \"Connect Google Drive\" to reconnect.");
+  }
+  try {
+    return await getFreshAccessToken(refreshToken);
+  } catch {
+    throw new Error("Google Drive connection expired — click \"Connect Google Drive\" to reconnect.");
+  }
 }
 
-export async function getGoogleDriveConnectionStatus(): Promise<{ connected: boolean; error: boolean }> {
-  const session = await getServerSession(authOptions);
-  const s = session as unknown as SessionWithToken | null;
-  return { connected: Boolean(s?.googleDriveConnected), error: Boolean(s?.googleDriveError) };
+export async function getGoogleDriveConnectionStatus(): Promise<{ connected: boolean }> {
+  const cookieStore = await cookies();
+  return { connected: Boolean(cookieStore.get(GOOGLE_DRIVE_COOKIE)?.value) };
 }
 
 // This browser tab holds its own copy of resume.json from whenever the
