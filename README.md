@@ -29,18 +29,58 @@ API using your own OAuth session, and PDF rendering reuses the
 `generate-pdf.js` script and `regenerate-pdf.yml` workflow already in
 `resume-core`.
 
-## Interface
+## Features
 
+**Editing surface**
 - **Sidebar navigation** (shadcn `sidebar-01` block) with a live command
   palette (`⌘K`) search, per-section item counts, and the signed-in GitHub
   account in the footer
-- **Responsive card grid** for every section — Work Experience and Projects
-  as 2-column cards, Skills/Education/Certificates/References up to 3 columns
-  — instead of one long stacked form
+- **Responsive card grid** for every resume section — Work Experience and
+  Projects as 2-column cards, Skills/Education/Certificates/References up to
+  3 columns — instead of one long stacked form; click any card for a
+  full-detail view
+- **Add project → Import from GitHub** — pick any repo you own, and an AI
+  step drafts 2–3 ATS-style bullet points from its description/languages
+  before you commit the entry (same AI step `resume-core`'s automated
+  pipeline uses)
 - **Drag-and-drop photo upload** straight to `resume-core/assets/`, with a
   live preview proxied through a private, authenticated API route
-- **Toast notifications** ([`goey-toast`](https://goey-toast.vercel.app)) on
-  save success/failure
+  (`/api/asset`) so the private repo image never needs a public URL
+- **Styled `ConfirmDialog`** in place of native `window.confirm()` for every
+  destructive action (removing a section entry, deleting a Drive file)
+- **Toast notifications** ([`goey-toast`](https://goey-toast.vercel.app)) for
+  save success/failure and a live progress spinner while a Drive upload is
+  in flight
+
+**Templates** — a live, side-by-side gallery of every resume PDF layout
+under `resume-core/templates/`, each thumbnail rendered from your *real,
+current* resume data (not a static mock). Switch the active template with
+one click; **Save & Regenerate PDF** re-renders `resume.pdf` through the same
+Puppeteer pipeline `resume-core`'s workflows use.
+
+**Project Drive** — a live gallery, one card per tracked project, reading
+straight from each project's Google Drive folder (Mockups / Screenshots /
+Assets) — no sync step, no waiting on a GitHub Actions run:
+- **Upload** — drag or pick an image; runs under your own Google account
+  (see [Google OAuth setup](#2-create-a-google-oauth-client-optional--only-for-uploading-via-project-drive)
+  below) since a service account has no storage quota to own new files with
+- **Rename / Delete (move to Bin)** — runs as the shared service account
+  first; if that account isn't the file's owner (e.g. an image someone
+  dragged straight into Drive rather than uploading through this app) it
+  transparently retries as your own signed-in account instead of just
+  surfacing a 403
+- **Open Folder** / **Sync to Projects tab** — jump to the real Drive folder,
+  or pull newly-added files into that project's `mockups[]` in `resume.json`
+- Filter by category (Mockups / Screenshots / Assets) or project name
+
+**Docs** — an in-app walkthrough of how a tracked GitHub repo becomes a
+bullet point on the live resume: prerequisites, the `resume-project` /
+`resume-ready` topic distinction, and what each GitHub Actions run does —
+so onboarding a new project never requires reading `resume-core`'s README.
+
+**Resume PDF** — one click to the always-current, live PDF on Google Drive
+(same file every pipeline run overwrites in place, so the link never
+changes).
 
 ## Screenshots
 
@@ -63,6 +103,10 @@ API using your own OAuth session, and PDF rendering reuses the
 </tr>
 <tr>
 <td width="50%"><img src=".github/screenshots/references.png" alt="References tab" /><br/><sub><b>References</b></sub></td>
+<td width="50%"><img src=".github/screenshots/templates.png" alt="Templates tab" /><br/><sub><b>Templates</b> — live thumbnails rendered from real resume data, switch layout in one click</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src=".github/screenshots/project-drive.png" alt="Project Drive gallery" /><br/><sub><b>Project Drive</b> — one gallery for every project's Google Drive folder</sub></td>
 <td width="50%"></td>
 </tr>
 </table>
@@ -205,3 +249,8 @@ configured, Google's — updated to the real domain).
 - `/api/asset` proxies private repo images (like the profile photo) through
   an authenticated server route so `<img>` tags never need a public URL or a
   client-exposed token.
+- Google Drive delete/rename always tries the shared service account first
+  and only ever falls back to your personal Drive token on a 403 from that
+  account — it never uses your token as the default path, so a normal
+  session never needs the broader Google scope unless the service account
+  genuinely can't do the operation itself.
