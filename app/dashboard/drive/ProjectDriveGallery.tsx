@@ -201,16 +201,36 @@ export function ProjectDriveGallery({
     setUploadingKey(key);
     const formData = new FormData();
     formData.append("file", file);
-    const result = await uploadDriveFile(folderIdForCategory(project.driveFolder, category), formData);
-    setUploadingKey(null);
-    const input = fileInputRefs.current[key];
-    if (input) input.value = "";
 
-    if (result.ok) {
-      gooeyToast.success("Uploaded", { description: `Added to ${project.name} / ${CATEGORY_LABELS[category]}.` });
+    // Server Actions don't expose byte-level upload progress (no XHR
+    // onUploadProgress hook to tap into), so this is the honest version of
+    // a progress indicator: a toast that stays in its spinning "loading"
+    // state for the whole upload, then flips to success/error — rather
+    // than the button's static "Uploading…" text disappearing all at once
+    // with no toast feedback until it's already done.
+    const uploadPromise = uploadDriveFile(
+      folderIdForCategory(project.driveFolder, category),
+      formData
+    ).then((result) => {
+      if (!result.ok) throw new Error(result.error);
+      return result;
+    });
+
+    gooeyToast.promise(uploadPromise, {
+      loading: `Uploading ${file.name}…`,
+      success: `Added to ${project.name} / ${CATEGORY_LABELS[category]}`,
+      error: (err) => (err instanceof Error ? err.message : "Upload failed"),
+    });
+
+    try {
+      await uploadPromise;
       loadLive(project);
-    } else {
-      gooeyToast.error("Upload failed", { description: result.error });
+    } catch {
+      // gooeyToast.promise already surfaced the error toast above.
+    } finally {
+      setUploadingKey(null);
+      const input = fileInputRefs.current[key];
+      if (input) input.value = "";
     }
   }
 
