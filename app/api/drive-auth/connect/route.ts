@@ -10,5 +10,5 @@ export async function GET(request: NextRequest) {
   if (!session) {
     return NextResponse.redirect(new URL("/signin", request.url));
   }
-  return NextResponse.redirect(getGoogleAuthUrl());
+  return NextResponse.redirect(getGoogleAuthUrl(request.nextUrl.origin));
 }

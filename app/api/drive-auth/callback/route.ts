@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { refreshToken, email } = await exchangeCodeForRefreshToken(code);
+    const { refreshToken, email } = await exchangeCodeForRefreshToken(code, request.nextUrl.origin);
     const allowedEmail = process.env.ALLOWED_GOOGLE_EMAIL;
 
     if (!allowedEmail || email !== allowedEmail) {
