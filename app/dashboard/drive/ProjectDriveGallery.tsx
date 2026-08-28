@@ -20,6 +20,7 @@ import {
   CloudIcon,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { MockupCategory, ProjectDriveFolder, ProjectItem } from "@/lib/types";
 import {
   syncProjectDriveFolder,
@@ -90,6 +91,7 @@ export function ProjectDriveGallery({
   const [syncingRepo, setSyncingRepo] = useState<string | null>(null);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ project: ProjectItem; file: DisplayFile } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ project: ProjectItem; file: DisplayFile } | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -234,11 +236,14 @@ export function ProjectDriveGallery({
     }
   }
 
-  async function handleDelete(project: ProjectItem, file: DisplayFile, event: React.MouseEvent) {
+  function requestDelete(project: ProjectItem, file: DisplayFile, event: React.MouseEvent) {
     event.stopPropagation();
-    if (!window.confirm(`Move "${file.fileName}" to Drive's Bin? You can restore it from there if needed.`)) {
-      return;
-    }
+    setPendingDelete({ project, file });
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const { project, file } = pendingDelete;
     const result = await deleteDriveFile(file.id);
     if (result.ok) {
       gooeyToast.success("Moved to Bin");
@@ -483,7 +488,7 @@ export function ProjectDriveGallery({
                         )}
                         <button
                           type="button"
-                          onClick={(e) => handleDelete(project, file, e)}
+                          onClick={(e) => requestDelete(project, file, e)}
                           title="Move to Bin"
                           className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white opacity-0 transition-opacity hover:bg-red-500 group-hover:opacity-100"
                         >
@@ -572,6 +577,20 @@ export function ProjectDriveGallery({
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Move to Drive's Bin?"
+        description={
+          pendingDelete
+            ? `"${pendingDelete.file.fileName}" will be moved to Drive's Bin — you can restore it from there if needed.`
+            : ""
+        }
+        confirmLabel="Move to Bin"
+        variant="danger"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
