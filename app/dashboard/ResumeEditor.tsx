@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { gooeyToast } from "goey-toast";
 import type { ResumeData, ProjectItem } from "@/lib/types";
@@ -27,6 +27,7 @@ import { EducationSection } from "./sections/EducationSection";
 import { CertificatesSection } from "./sections/CertificatesSection";
 import { ReferencesSection } from "./sections/ReferencesSection";
 import { TemplatesSection } from "./sections/TemplatesSection";
+import { Link2 } from "lucide-react";
 
 type Tab =
   | "basics"
@@ -36,7 +37,8 @@ type Tab =
   | "education"
   | "certificates"
   | "references"
-  | "templates";
+  | "templates"
+  | "jobmail";
 
 function buildNavItems(data: ResumeData): ResumeNavItem[] {
   return [
@@ -54,6 +56,7 @@ function buildNavItems(data: ResumeData): ResumeNavItem[] {
     },
     { id: "references", title: "References", icon: UsersIcon, color: "emerald", count: data.references.length },
     { id: "templates", title: "Templates", icon: TemplateIcon, color: "teal", count: null },
+    { id: "jobmail", title: "Connect JobMail", icon: Link2, color: "violet", count: null },
   ];
 }
 
@@ -66,7 +69,47 @@ const TAB_TITLES: Record<Tab, string> = {
   certificates: "Certificates",
   references: "References",
   templates: "Templates",
+  jobmail: "Connect JobMail",
 };
+
+function JobMailConnection() {
+  const [code, setCode] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/integrations/jobmail/connect").then((response) => response.json()),
+      fetch("/api/integrations/jobmail/status").then((response) => response.json()),
+    ]).then(([connection, status]) => {
+      setCode(connection.code || "");
+      setConnected(status.connected === true);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <section className="max-w-xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-start gap-3">
+        <Link2 className="mt-1 h-5 w-5 text-violet-600" />
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Connect JobMail</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Paste this temporary code into JobMail to connect your one JobMail account.
+          </p>
+        </div>
+      </div>
+      <div className={`mb-5 rounded-lg px-3 py-2 text-sm ${connected ? "bg-emerald-50 text-emerald-700" : "bg-gray-50 text-gray-600"}`}>
+        {connected ? "Connected to JobMail" : "Not connected"}
+      </div>
+      {loading ? <p className="text-sm text-gray-500">Generating secure code…</p> : (
+        <div>
+          <label htmlFor="jobmail-code" className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">Connection code (expires in 10 minutes)</label>
+          <textarea id="jobmail-code" readOnly value={code} rows={3} className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700" />
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
   const [data, setData] = useState<ResumeData>(initialData);
@@ -198,6 +241,7 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
                     onSelect={(templateId) => setData({ ...data, template: templateId })}
                   />
                 )}
+                {activeTab === "jobmail" && <JobMailConnection />}
               </motion.div>
             </AnimatePresence>
           </div>
