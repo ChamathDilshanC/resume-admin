@@ -18,6 +18,7 @@ import {
   PencilIcon,
   CheckIcon,
   CloudIcon,
+  PlayIcon,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -35,10 +36,18 @@ const CATEGORY_LABELS: Record<MockupCategory, string> = {
   mockups: "Mockups",
   screenshots: "Screenshots",
   assets: "Assets",
+  animations: "Animations",
 };
 
-const UPLOAD_ACCEPT = "image/png,image/jpeg,image/webp";
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg,image/webp";
+const VIDEO_UPLOAD_ACCEPT = "video/mp4,video/webm,video/quicktime";
+const UPLOAD_ACCEPT = `${IMAGE_UPLOAD_ACCEPT},${VIDEO_UPLOAD_ACCEPT}`;
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+function isVideoMimeType(mimeType: string | undefined): boolean {
+  return !!mimeType && VIDEO_UPLOAD_ACCEPT.split(",").includes(mimeType);
+}
 
 // Drive's thumbnailLink comes back small (~220px). It's a Google-signed URL
 // that also accepts a size override, so requesting a larger render for the
@@ -52,12 +61,14 @@ function folderIdForCategory(driveFolder: ProjectDriveFolder, category: MockupCa
     mockups: driveFolder.mockupsFolderId,
     screenshots: driveFolder.screenshotsFolderId,
     assets: driveFolder.assetsFolderId,
+    animations: driveFolder.animationsFolderId,
   }[category];
 }
 
 interface DisplayFile {
   id: string;
   fileName: string;
+  mimeType: string;
   thumbnailLink?: string;
   webViewLink?: string;
   category: MockupCategory;
@@ -149,6 +160,7 @@ export function ProjectDriveGallery({
           .map((f) => ({
             id: f.id,
             fileName: f.name,
+            mimeType: f.mimeType,
             thumbnailLink: f.thumbnailLink,
             webViewLink: f.webViewLink,
             category: f.category,
@@ -192,11 +204,17 @@ export function ProjectDriveGallery({
     const category = uploadCategory();
 
     if (!UPLOAD_ACCEPT.split(",").includes(file.type)) {
-      gooeyToast.error("Unsupported file type", { description: "Please upload a PNG, JPG, or WEBP image." });
+      gooeyToast.error("Unsupported file type", {
+        description: "Please upload a PNG, JPG, WEBP image or an MP4, WEBM, MOV video.",
+      });
       return;
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      gooeyToast.error("File too large", { description: "Images must be smaller than 10MB." });
+    const isVideo = isVideoMimeType(file.type);
+    const maxBytes = isVideo ? MAX_VIDEO_UPLOAD_BYTES : MAX_IMAGE_UPLOAD_BYTES;
+    if (file.size > maxBytes) {
+      gooeyToast.error("File too large", {
+        description: `${isVideo ? "Videos" : "Images"} must be smaller than ${maxBytes / (1024 * 1024)}MB.`,
+      });
       return;
     }
 
@@ -343,7 +361,7 @@ export function ProjectDriveGallery({
             />
           </div>
           <div className="flex shrink-0 gap-0.5 rounded-lg border border-gray-200 bg-white p-0.5">
-            {(["all", "mockups", "screenshots", "assets"] as const).map((option) => (
+            {(["all", "mockups", "screenshots", "assets", "animations"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -478,6 +496,13 @@ export function ProjectDriveGallery({
                             <ImageOffIcon className="h-6 w-6" />
                           </div>
                         )}
+                        {isVideoMimeType(file.mimeType) && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/10">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white">
+                              <PlayIcon className="h-3.5 w-3.5 fill-current" />
+                            </span>
+                          </span>
+                        )}
                         <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 text-left text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
                           {file.fileName}
                         </span>
@@ -524,16 +549,28 @@ export function ProjectDriveGallery({
               >
                 <XIcon className="h-4 w-4" />
               </button>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={
-                  preview.file.thumbnailLink
-                    ? largePreviewUrl(preview.file.thumbnailLink)
-                    : preview.file.webViewLink
-                }
-                alt={preview.file.fileName}
-                className="max-h-[85vh] max-w-[85vw] rounded-xl object-contain shadow-2xl"
-              />
+              {isVideoMimeType(preview.file.mimeType) ? (
+                // Drive doesn't expose a direct, unauthenticated video byte
+                // stream — its documented embed (the /preview iframe) is the
+                // reliable way to play a file back using the viewer's own
+                // Google session, without a server-side proxy.
+                <iframe
+                  src={`https://drive.google.com/file/d/${preview.file.id}/preview`}
+                  allow="autoplay"
+                  className="h-[70vh] w-[85vw] max-w-3xl rounded-xl bg-black shadow-2xl"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={
+                    preview.file.thumbnailLink
+                      ? largePreviewUrl(preview.file.thumbnailLink)
+                      : preview.file.webViewLink
+                  }
+                  alt={preview.file.fileName}
+                  className="max-h-[85vh] max-w-[85vw] rounded-xl object-contain shadow-2xl"
+                />
+              )}
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 rounded-b-xl bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
                 {renaming ? (
                   <div className="flex min-w-0 flex-1 items-center gap-2">

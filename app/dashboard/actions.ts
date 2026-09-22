@@ -20,7 +20,7 @@ import {
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
 import { generateProjectHighlights, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
-import { listFolderImages, uploadImageToFolder, renameFile, trashFile } from "@/lib/google-drive";
+import { listFolderFiles, uploadFileToFolder, renameFile, trashFile } from "@/lib/google-drive";
 import { getFreshAccessToken } from "@/lib/google-drive-oauth";
 import { decrypt } from "@/lib/crypto";
 import type { ResumeData, ProjectItem, ProjectDriveFolder, MockupCategory } from "@/lib/types";
@@ -373,19 +373,24 @@ export interface LiveDriveFile {
 // a project's folder shows up the moment this is called — no Sync click,
 // no waiting on a workflow run. Read-only; doesn't touch resume.json.
 export async function fetchLiveDriveFiles(
-  driveFolder: Pick<ProjectDriveFolder, "mockupsFolderId" | "screenshotsFolderId" | "assetsFolderId">
+  driveFolder: Pick<
+    ProjectDriveFolder,
+    "mockupsFolderId" | "screenshotsFolderId" | "assetsFolderId" | "animationsFolderId"
+  >
 ): Promise<{ ok: true; files: LiveDriveFile[] } | { ok: false; error: string }> {
   try {
     await requireAccessToken();
-    const [mockups, screenshots, assets] = await Promise.all([
-      listFolderImages(driveFolder.mockupsFolderId),
-      listFolderImages(driveFolder.screenshotsFolderId),
-      listFolderImages(driveFolder.assetsFolderId),
+    const [mockups, screenshots, assets, animations] = await Promise.all([
+      listFolderFiles(driveFolder.mockupsFolderId),
+      listFolderFiles(driveFolder.screenshotsFolderId),
+      listFolderFiles(driveFolder.assetsFolderId),
+      listFolderFiles(driveFolder.animationsFolderId),
     ]);
     const files: LiveDriveFile[] = [
       ...mockups.map((f) => ({ ...f, category: "mockups" as const })),
       ...screenshots.map((f) => ({ ...f, category: "screenshots" as const })),
       ...assets.map((f) => ({ ...f, category: "assets" as const })),
+      ...animations.map((f) => ({ ...f, category: "animations" as const })),
     ];
     return { ok: true, files };
   } catch (error) {
@@ -393,8 +398,10 @@ export async function fetchLiveDriveFiles(
   }
 }
 
-const DRIVE_UPLOAD_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
-const MAX_DRIVE_UPLOAD_BYTES = 10 * 1024 * 1024;
+const DRIVE_UPLOAD_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const DRIVE_UPLOAD_VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 export async function uploadDriveFile(
   folderId: string,
@@ -406,15 +413,17 @@ export async function uploadDriveFile(
     if (!(file instanceof File)) {
       throw new Error("No file provided.");
     }
-    if (!DRIVE_UPLOAD_MIME_TYPES.has(file.type)) {
-      throw new Error("Only PNG, JPG, or WEBP images are supported.");
+    const isVideo = DRIVE_UPLOAD_VIDEO_MIME_TYPES.has(file.type);
+    if (!isVideo && !DRIVE_UPLOAD_IMAGE_MIME_TYPES.has(file.type)) {
+      throw new Error("Only PNG, JPG, WEBP images or MP4, WEBM, MOV videos are supported.");
     }
-    if (file.size > MAX_DRIVE_UPLOAD_BYTES) {
-      throw new Error("Image must be smaller than 10MB.");
+    const maxBytes = isVideo ? MAX_VIDEO_UPLOAD_BYTES : MAX_IMAGE_UPLOAD_BYTES;
+    if (file.size > maxBytes) {
+      throw new Error(`${isVideo ? "Video" : "Image"} must be smaller than ${maxBytes / (1024 * 1024)}MB.`);
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    await uploadImageToFolder(googleAccessToken, folderId, file.name, file.type, buffer);
+    await uploadFileToFolder(googleAccessToken, folderId, file.name, file.type, buffer);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };

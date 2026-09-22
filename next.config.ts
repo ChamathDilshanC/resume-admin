@@ -5,9 +5,10 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       // Default is 1MB, silently rejected before the action even runs —
-      // too small for mockup/screenshot uploads (up to 10MB, matching the
-      // validation in app/dashboard/actions.ts's uploadDriveFile).
-      bodySizeLimit: "10mb",
+      // too small for mockup/screenshot uploads (up to 10MB) or animation
+      // video uploads (up to 100MB), matching the validation in
+      // app/dashboard/actions.ts's uploadDriveFile.
+      bodySizeLimit: "100mb",
     },
   },
 };

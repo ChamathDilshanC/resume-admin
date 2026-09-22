@@ -9,9 +9,23 @@ export interface DriveFile {
   thumbnailLink?: string;
 }
 
+export interface DrivePdf {
+  buffer: Buffer;
+  name: string;
+  mimeType: string;
+  modifiedTime?: string;
+}
+
 // Same set resume-core's sync accepts — keep in sync with
 // resume-core/scripts/lib/google-drive.js's SUPPORTED_MIME_TYPES.
-const SUPPORTED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const SUPPORTED_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+]);
 
 // Service-account client: used for everything that doesn't create new file
 // content (listing, rename, trash) — none of that needs storage quota, so
@@ -21,6 +35,7 @@ function getServiceAccountDriveClient(): drive_v3.Drive {
   if (!credentialsJson) {
     throw new Error("GDRIVE_CREDENTIALS is not configured on resume-admin.");
   }
+
   const auth = new google.auth.GoogleAuth({
     credentials: JSON.parse(credentialsJson),
     // Broad "drive" scope (not drive.file) for the same reason resume-core
@@ -30,6 +45,34 @@ function getServiceAccountDriveClient(): drive_v3.Drive {
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
   return google.drive({ version: "v3", auth });
+}
+
+/**
+ * Downloads the stable, in-place-updated resume PDF. The service account is
+ * used so this endpoint never needs to receive or return a user's OAuth token.
+ */
+export async function downloadResumePdf(fileId: string): Promise<DrivePdf> {
+  const drive = getServiceAccountDriveClient();
+  const metadata = await drive.files.get({
+    fileId,
+    fields: "id,name,mimeType,modifiedTime,trashed",
+  });
+  const file = metadata.data;
+  if (!file.id || !file.name || file.trashed || file.mimeType !== "application/pdf") {
+    throw new Error("Configured resume Drive file is unavailable or is not a PDF.");
+  }
+
+  const media = await drive.files.get(
+    { fileId, alt: "media" },
+    { responseType: "arraybuffer" }
+  );
+  const data = media.data as ArrayBuffer | Buffer;
+  return {
+    buffer: Buffer.isBuffer(data) ? data : Buffer.from(data),
+    name: file.name,
+    mimeType: file.mimeType,
+    modifiedTime: file.modifiedTime ?? undefined,
+  };
 }
 
 // User-OAuth client: the only one that can create new file *content*. A
@@ -47,7 +90,7 @@ function getUserDriveClient(accessToken: string): drive_v3.Drive {
 // Drive gallery so a file dropped into Drive shows up the moment the page
 // is opened/refreshed, instead of only after resume-core's background sync
 // workflow has run and committed resume.json.
-export async function listFolderImages(folderId: string): Promise<DriveFile[]> {
+export async function listFolderFiles(folderId: string): Promise<DriveFile[]> {
   const drive = getServiceAccountDriveClient();
   const files: DriveFile[] = [];
   let pageToken: string | undefined;
@@ -78,7 +121,7 @@ export async function listFolderImages(folderId: string): Promise<DriveFile[]> {
 
 // Requires a real user's OAuth access token (not the service account) —
 // see getUserDriveClient's comment above for why.
-export async function uploadImageToFolder(
+export async function uploadFileToFolder(
   accessToken: string,
   folderId: string,
   fileName: string,
@@ -111,7 +154,7 @@ function isPermissionError(error: unknown): boolean {
 
 // The service account owns files/folders that resume-core's pipeline
 // created, but not ones a real person dragged straight into Drive (or that
-// this app uploaded via uploadImageToFolder, which has to run as the user
+// this app uploaded via uploadFileToFolder, which has to run as the user
 // for the quota reason above) — Drive only lets the *owner* update those,
 // so the service account 403s on them. When that happens and the caller has
 // a Google Drive access token for the signed-in user, retry as them: as the

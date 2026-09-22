@@ -33,7 +33,7 @@ export interface ProjectLink {
   url: string;
 }
 
-export type MockupCategory = "mockups" | "screenshots" | "assets";
+export type MockupCategory = "mockups" | "screenshots" | "assets" | "animations";
 
 export interface ProjectMockup {
   /** Same value as googleDriveFileId — stable identity for React keys/reorder. */
@@ -59,6 +59,7 @@ export interface ProjectDriveFolder {
   mockupsFolderId: string;
   screenshotsFolderId: string;
   assetsFolderId: string;
+  animationsFolderId: string;
   createdAt: string;
   lastSyncedAt: string;
 }

@@ -71,7 +71,9 @@ Assets) — no sync step, no waiting on a GitHub Actions run:
   surfacing a 403
 - **Open Folder** / **Sync to Projects tab** — jump to the real Drive folder,
   or pull newly-added files into that project's `mockups[]` in `resume.json`
-- Filter by category (Mockups / Screenshots / Assets) or project name
+- Filter by category (Mockups / Screenshots / Assets / Animations) or project name
+- Animations category accepts short MP4/WEBM/MOV demo clips (up to 100MB) in
+  addition to images, played back in the preview lightbox
 
 **Docs** — an in-app walkthrough of how a tracked GitHub repo becomes a
 bullet point on the live resume: prerequisites, the `resume-project` /
@@ -198,6 +200,10 @@ Copy `.env.example` to `.env.local` (for local dev) and fill in:
 - `NEXTAUTH_SECRET` — generate with `openssl rand -base64 32`
 - `NEXTAUTH_URL` — `http://localhost:3000` locally, your real deployed URL in production
 - `ALLOWED_GITHUB_USERNAME` — defaults to `ChamathDilshanC`
+- `JOBMAIL_INTEGRATION_SECRET` — a server-only secret required by
+  `GET /api/integrations/jobmail/resume`; JobMail should send it as
+  the configured value in its authentication header. The endpoint is scoped to the stable
+  `GDRIVE_FILE_ID` PDF and returns its bytes with a `Last-Modified` header.
 - `RESUME_REPO_OWNER` / `RESUME_REPO_NAME` — the pipeline repo, defaults to
   `ChamathDilshanC/resume-core`
 - `RESUME_DATA_REPO_NAME` — the private repo `resume.json` itself lives in,
@@ -208,6 +214,8 @@ Copy `.env.example` to `.env.local` (for local dev) and fill in:
   app can browse/rename/delete files inside a project's Drive folder, but
   never creates the folder itself (still resume-core's job) and can't
   upload new files (see below).
+- `GDRIVE_FILE_ID` — the stable Drive file ID used by resume-core for
+  `resume.pdf`. This is server-only and is used by the JobMail integration.
 - `GOOGLE_DRIVE_OAUTH_CLIENT_ID` / `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET`
   *(optional — only needed to upload via "Project Drive")* — from step 2
 - `ALLOWED_GOOGLE_EMAIL` *(required if the above two are set)* — the only

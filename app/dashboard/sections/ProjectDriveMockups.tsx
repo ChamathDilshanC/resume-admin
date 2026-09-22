@@ -117,7 +117,8 @@ export function ProjectDriveMockups({
         <p className="text-xs text-gray-500">
           Folder ready. Drop images into its <code className="rounded bg-gray-100 px-1 py-0.5">mockups</code>,{" "}
           <code className="rounded bg-gray-100 px-1 py-0.5">screenshots</code>, or{" "}
-          <code className="rounded bg-gray-100 px-1 py-0.5">assets</code> subfolder on Drive, then Sync Mockups.
+          <code className="rounded bg-gray-100 px-1 py-0.5">assets</code> subfolder (or a short demo video into{" "}
+          <code className="rounded bg-gray-100 px-1 py-0.5">animations</code>) on Drive, then Sync Mockups.
         </p>
       ) : (
         <p className="text-xs text-gray-500">
