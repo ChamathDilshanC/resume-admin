@@ -76,15 +76,36 @@ function JobMailConnection() {
   const [code, setCode] = useState("");
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function loadConnection() {
+    setLoading(true);
+    setError("");
+    try {
+      const [connectionResponse, statusResponse] = await Promise.all([
+        fetch("/api/integrations/jobmail/connect"),
+        fetch("/api/integrations/jobmail/status"),
+      ]);
+      const connection = await connectionResponse.json().catch(() => ({}));
+      const status = await statusResponse.json().catch(() => ({}));
+      if (!connectionResponse.ok) {
+        throw new Error(connection.error || "Unable to generate a connection code.");
+      }
+      if (!statusResponse.ok) {
+        throw new Error(status.error || "Unable to load connection status.");
+      }
+      setCode(typeof connection.code === "string" ? connection.code : "");
+      setConnected(status.connected === true);
+    } catch (connectionError) {
+      setCode("");
+      setError(connectionError instanceof Error ? connectionError.message : "Unable to generate a connection code.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/integrations/jobmail/connect").then((response) => response.json()),
-      fetch("/api/integrations/jobmail/status").then((response) => response.json()),
-    ]).then(([connection, status]) => {
-      setCode(connection.code || "");
-      setConnected(status.connected === true);
-    }).finally(() => setLoading(false));
+    void loadConnection();
   }, []);
 
   return (
@@ -101,10 +122,20 @@ function JobMailConnection() {
       <div className={`mb-5 rounded-lg px-3 py-2 text-sm ${connected ? "bg-emerald-50 text-emerald-700" : "bg-gray-50 text-gray-600"}`}>
         {connected ? "Connected to JobMail" : "Not connected"}
       </div>
-      {loading ? <p className="text-sm text-gray-500">Generating secure code…</p> : (
+      {loading ? <p className="text-sm text-gray-500">Generating secure code…</p> : error ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          <p>{error}</p>
+          <button type="button" onClick={() => void loadConnection()} className="mt-3 rounded-md bg-rose-700 px-3 py-1.5 text-xs font-medium text-white">
+            Generate new code
+          </button>
+        </div>
+      ) : (
         <div>
           <label htmlFor="jobmail-code" className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">Connection code (expires in 10 minutes)</label>
           <textarea id="jobmail-code" readOnly value={code} rows={3} className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700" />
+          <button type="button" onClick={() => void loadConnection()} className="mt-3 text-xs font-medium text-violet-700 hover:underline">
+            Generate a new code
+          </button>
         </div>
       )}
     </section>

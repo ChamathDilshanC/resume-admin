@@ -41,15 +41,23 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const accountId = (session.user as { login?: string } | undefined)?.login || "ChamathDilshanC";
-  const payload = Buffer.from(
-    JSON.stringify({
-      accountId,
-      nonce: randomBytes(16).toString("hex"),
-      expiresAt: Date.now() + TOKEN_TTL_SECONDS * 1000,
-    }),
-  ).toString("base64url");
-  return NextResponse.json({ code: `${payload}.${sign(payload)}`, expiresIn: TOKEN_TTL_SECONDS });
+  try {
+    const accountId = (session.user as { login?: string } | undefined)?.login || "ChamathDilshanC";
+    const payload = Buffer.from(
+      JSON.stringify({
+        accountId,
+        nonce: randomBytes(16).toString("hex"),
+        expiresAt: Date.now() + TOKEN_TTL_SECONDS * 1000,
+      }),
+    ).toString("base64url");
+    return NextResponse.json({ code: `${payload}.${sign(payload)}`, expiresIn: TOKEN_TTL_SECONDS });
+  } catch (error) {
+    console.error("JobMail connection code generation failed", error);
+    return NextResponse.json(
+      { error: "Connection code is unavailable. Configure JOBMAIL_INTEGRATION_SECRET and redeploy DevResume." },
+      { status: 503 },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
