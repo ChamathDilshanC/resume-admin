@@ -28,6 +28,7 @@ import { CertificatesSection } from "./sections/CertificatesSection";
 import { ReferencesSection } from "./sections/ReferencesSection";
 import { TemplatesSection } from "./sections/TemplatesSection";
 import { Link2 } from "lucide-react";
+import { OtpInput } from "@/components/ui/otp-input";
 
 type Tab =
   | "basics"
@@ -131,8 +132,9 @@ function JobMailConnection() {
         </div>
       ) : (
         <div>
-          <label htmlFor="jobmail-code" className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">Connection code (expires in 10 minutes)</label>
-          <textarea id="jobmail-code" readOnly value={code} rows={3} className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700" />
+          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">Connection code (expires in 10 minutes)</label>
+          <OtpInput value={code} length={6} onChange={() => undefined} aria-label="JobMail connection code" status="success" size="md" />
+          <p className="mt-3 text-xs text-gray-500">Enter these 6 digits in JobMail Profile → Connect DevResume.</p>
           <button type="button" onClick={() => void loadConnection()} className="mt-3 text-xs font-medium text-violet-700 hover:underline">
             Generate a new code
           </button>

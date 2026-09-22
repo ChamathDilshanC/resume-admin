@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 export const runtime = "nodejs";
 
 const TOKEN_TTL_SECONDS = 10 * 60;
+const OTP_BUCKET_SECONDS = 10 * 60;
 
 function secret() {
   const value = process.env.JOBMAIL_INTEGRATION_SECRET;
@@ -15,6 +16,11 @@ function secret() {
 
 function sign(payload: string) {
   return createHmac("sha256", secret()).update(payload).digest("base64url");
+}
+
+function otpFor(accountId: string, bucket: number) {
+  const digest = createHmac("sha256", secret()).update(`${accountId}:${bucket}`).digest();
+  return String(digest.readUInt32BE(0) % 1_000_000).padStart(6, "0");
 }
 
 function verifyToken(token: string) {
@@ -43,6 +49,7 @@ export async function GET() {
 
   try {
     const accountId = (session.user as { login?: string } | undefined)?.login || "ChamathDilshanC";
+    const otp = otpFor(accountId, Math.floor(Date.now() / 1000 / OTP_BUCKET_SECONDS));
     const payload = Buffer.from(
       JSON.stringify({
         accountId,
@@ -50,7 +57,7 @@ export async function GET() {
         expiresAt: Date.now() + TOKEN_TTL_SECONDS * 1000,
       }),
     ).toString("base64url");
-    return NextResponse.json({ code: `${payload}.${sign(payload)}`, expiresIn: TOKEN_TTL_SECONDS });
+    return NextResponse.json({ code: otp, token: `${payload}.${sign(payload)}`, expiresIn: TOKEN_TTL_SECONDS });
   } catch (error) {
     console.error("JobMail connection code generation failed", error);
     return NextResponse.json(
@@ -72,8 +79,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { code } = await request.json().catch(() => ({}));
-  const payload = typeof code === "string" ? verifyToken(code) : null;
+  const { code, token } = await request.json().catch(() => ({}));
+  const otp = typeof code === "string" ? code.replace(/\s/g, "") : "";
+  const accountId = "ChamathDilshanC";
+  const currentBucket = Math.floor(Date.now() / 1000 / OTP_BUCKET_SECONDS);
+  const validOtp = /^[0-9]{6}$/.test(otp) &&
+    [currentBucket, currentBucket - 1].some((bucket) => otp === otpFor(accountId, bucket));
+  const payload = typeof token === "string" ? verifyToken(token) : validOtp ? { accountId } : null;
   if (!payload) return NextResponse.json({ error: "Invalid or expired connection code" }, { status: 400 });
   return NextResponse.json({ accountId: payload.accountId });
 }
