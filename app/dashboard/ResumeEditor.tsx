@@ -241,6 +241,7 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
                 )}
                 {activeTab === "projects" && (
                   <ProjectsSection
+                    target={{ targetRole: data.basics.label, jobDescription: data.basics.jobDescription }}
                     items={data.projects}
                     onChange={(projects) => setData({ ...data, projects })}
                     onSaveProjectPatch={saveProjectPatch}

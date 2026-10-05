@@ -19,7 +19,8 @@ import {
   type TemplateSummary,
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
-import { generateProjectHighlights, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
+import { generateProjectContent, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
+import type { WritingTarget } from "@/lib/types";
 import { listFolderFiles, uploadFileToFolder, renameFile, trashFile } from "@/lib/google-drive";
 import { getFreshAccessToken } from "@/lib/google-drive-oauth";
 import { decrypt } from "@/lib/crypto";
@@ -256,11 +257,12 @@ export async function optimizeSummaryAction(
     const summary = await optimizeSummaryForAts({
       label: data.basics.label,
       currentSummary: data.basics.summary,
-      yearsOfExperience: yearsOfExperienceOf(data),
       skillKeywords: skillKeywordsOf(data),
-      workContext: data.work
-        .map((w) => `${w.position} at ${w.name} (${w.startDate || "?"} to ${w.endDate || "present"})`)
-        .join("; "),
+      workContext: JSON.stringify(data.work),
+      projectContext: JSON.stringify(data.projects.filter((p) => p.includeInResume !== false).map((p) => ({
+        name: p.name, description: p.description, role: p.role, highlights: p.highlights, evidence: p.evidence,
+      }))),
+      jobDescription: data.basics.jobDescription,
     });
     return { ok: true, summary };
   } catch (error) {
@@ -281,6 +283,8 @@ export async function optimizeWorkAction(
           position: item.position,
           company: item.name,
           highlights: item.highlights,
+          summary: item.summary,
+          target: { targetRole: data.basics.label, jobDescription: data.basics.jobDescription },
           skillKeywords,
         });
         return { ...item, highlights };
@@ -292,21 +296,14 @@ export async function optimizeWorkAction(
   }
 }
 
-function yearsOfExperienceOf(data: ResumeData): number {
-  const years = data.work
-    .map((w) => Number((w.startDate || "").slice(0, 4)))
-    .filter((y) => Number.isFinite(y) && y > 1990);
-  if (years.length === 0) return 0;
-  const earliest = Math.min(...years);
-  return Math.max(0, Math.floor((Date.now() - new Date(earliest, 0, 1).getTime()) / (365.25 * 24 * 3600 * 1000)));
-}
-
 function skillKeywordsOf(data: ResumeData): string[] {
   return data.skills.flatMap((s) => s.keywords).slice(0, 60);
 }
 
 export async function generateProjectFromGithubRepo(
-  repoName: string
+  repoName: string,
+  notes: Pick<ProjectItem, "role" | "technologies" | "evidence"> = {},
+  target: WritingTarget = {}
 ): Promise<{ ok: true; project: ProjectItem } | { ok: false; error: string }> {
   try {
     const accessToken = await requireAccessToken();
@@ -318,30 +315,35 @@ export async function generateProjectFromGithubRepo(
       repoName
     );
 
-    if (!techStack) {
-      throw new Error(
-        "GitHub reports no detectable languages for this repo (empty or a meta-repo with unreadable submodules)."
-      );
-    }
-
-    const highlights = await generateProjectHighlights({
-      repoName: name,
-      repoDescription: description,
-      techStack,
-    });
-
     const project: ProjectItem = {
       name,
       description,
-      highlights,
+      highlights: [],
       links: [{ label: name, url }],
       repoFullName,
       repositoryType: "MAIN",
+      role: notes.role,
+      technologies: [...new Set([...techStack.split(","), ...(notes.technologies || [])].map((t) => t.trim()).filter(Boolean))],
+      evidence: notes.evidence,
     };
+
+    Object.assign(project, await generateProjectContent(project, target));
 
     return { ok: true, project };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function draftProjectAction(
+  project: ProjectItem,
+  target: WritingTarget = {}
+): Promise<{ ok: true; draft: Pick<ProjectItem, "description" | "highlights"> } | { ok: false; error: string }> {
+  try {
+    await requireAccessToken();
+    return { ok: true, draft: await generateProjectContent(project, target) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not draft project content" };
   }
 }
 

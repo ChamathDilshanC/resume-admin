@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { gooeyToast } from "goey-toast";
-import { Field, StringListEditor, Button, SectionHeader } from "@/components/FormControls";
+import { Field, TextArea, StringListEditor, Button, SectionHeader } from "@/components/FormControls";
 import { ItemGrid } from "@/components/ItemGrid";
 import { BriefcaseIcon, SparklesIcon } from "@/components/icons";
 import type { ResumeData, WorkItem } from "@/lib/types";
@@ -69,6 +69,7 @@ export function WorkSection({
           </span>
         }
       />
+      <p className="mb-4 text-sm text-gray-500">Keep recent roles first. Describe systems, problems solved and results. Record promotions as separate roles; include ownership, mentoring, client work or design decisions only when you did them.</p>
       <ItemGrid
         items={items}
         icon={BriefcaseIcon}
@@ -84,6 +85,9 @@ export function WorkSection({
               <Field label="Company URL" value={item.url} onChange={(v) => update(i, { url: v })} />
               <Field label="Start Date" value={item.startDate} onChange={(v) => update(i, { startDate: v })} />
               <Field label="End Date" value={item.endDate} onChange={(v) => update(i, { endDate: v })} />
+            </div>
+            <div className="mt-3">
+              <TextArea label="Role scope / responsibilities" value={item.summary} onChange={(summary) => update(i, { summary })} />
             </div>
             <div className="mt-3">
               <StringListEditor

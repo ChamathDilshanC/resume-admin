@@ -1,27 +1,7 @@
-const PROJECT_SYSTEM_PROMPT = `You are an expert technical resume writer. Your task is to write professional, ATS-optimized resume bullet points for a software engineering project.
+import policy from "./resume-writing-policy.json";
+import type { ProjectItem, WritingTarget } from "./types";
 
-CRITICAL RULES:
-1. Write exactly 2 to 3 bullet points.
-2. Seamlessly integrate the provided "Technologies Used" into the sentences to explain *how* they were used.
-3. Start each bullet point with a strong action verb (e.g., Architected, Engineered, Developed, Built).
-4. DO NOT create a separate "Skills" or "Technologies" list.
-5. You MUST NOT mention, imply, or name-drop any technology, language, framework, or tool that is not
-   explicitly listed in "Technologies Used" — even if it seems typical or likely for a project like this
-   based on its name or description. If "Technologies Used" doesn't mention a database, AI library, or
-   framework, do not invent one. Only describe capabilities using the exact technologies given.
-6. You MUST return ONLY a valid JSON array of strings. Do not include markdown code blocks (like \`\`\`json), labels, or any conversational text.
-
-EXAMPLE INPUT:
-Project Name: VibeNet
-Project Description: Secure Real-Time End-to-End Encrypted Chat Platform.
-Technologies Used: Next.js 16, TypeScript, Web Crypto API, Tailwind CSS, Go, WebSocket, DynamoDB, PostgreSQL, AWS EC2.
-
-EXAMPLE OUTPUT:
-[
-  "Built a real-time E2EE chat client using Next.js 16 and TypeScript with Web Crypto API-based encryption, styled with Tailwind CSS.",
-  "Developed a Go backend with WebSocket-based real-time messaging and DynamoDB/PostgreSQL for data storage, deployed on AWS EC2.",
-  "Architected the system as a multi-repository monorepo with Git submodules and comprehensive architecture documentation."
-]`;
+const PROJECT_SYSTEM_PROMPT = `${policy.evidence}\n\n${policy.project}`;
 
 class AIRequestError extends Error {
   constructor(
@@ -89,82 +69,84 @@ async function callGeminiWithFallback(systemPrompt: string, userPrompt: string):
   throw lastError;
 }
 
-export async function generateProjectHighlights(params: {
-  repoName: string;
-  repoDescription: string;
-  techStack: string;
-}): Promise<string[]> {
-  const userPrompt = [
-    `Project Name: ${params.repoName}`,
-    `Project Description: ${params.repoDescription}`,
-    `Technologies Used: ${params.techStack}`,
-  ].join("\n");
-
-  return extractJsonArray(await callGeminiWithFallback(PROJECT_SYSTEM_PROMPT, userPrompt));
+export async function generateProjectContent(
+  project: ProjectItem,
+  target: WritingTarget = {}
+): Promise<Pick<ProjectItem, "description" | "highlights">> {
+  const raw = await callGeminiWithFallback(PROJECT_SYSTEM_PROMPT, JSON.stringify({
+    target,
+    project: {
+      name: project.name, description: project.description, role: project.role,
+      technologies: (project.technologies || []).map((t) => t.trim()).filter(Boolean), highlights: project.highlights,
+      evidence: project.evidence || {},
+    },
+  }));
+  const parsed = parseJson(raw);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+      typeof parsed.description !== "string" || !Array.isArray(parsed.highlights) ||
+      parsed.highlights.length > 3 || !parsed.highlights.every(isNonemptyString)) {
+    throw new Error("AI returned an invalid project draft. Your project was not changed.");
+  }
+  if (parsed.description.trim().split(/\s+/).length > 35 ||
+      parsed.highlights.some((h: string) => h.trim().split(/\s+/).length > 45)) {
+    throw new Error("AI draft was too long. Please try again.");
+  }
+  if (!parsed.description.trim() || parsed.highlights.length === 0) {
+    throw new Error("Add the project's purpose and your actual contribution before generating a draft.");
+  }
+  return { description: parsed.description.trim(), highlights: parsed.highlights.map((h: string) => h.trim()) };
 }
 
-const SUMMARY_SYSTEM_PROMPT = `You are an expert technical resume writer specializing in ATS (Applicant Tracking System) optimization.
-Rewrite a candidate's professional summary so it scores maximum ATS relevance.
-
-CRITICAL RULES:
-1. 3 to 5 sentences, single paragraph, no first-person pronouns (no "I", "my").
-2. Open with "<Adjective> <Target Job Title> with <N>+ years of hands-on experience ..." using the exact
-   target job title and the experience anchor provided. If years of experience is 0, omit the anchor.
-3. Naturally weave in the most relevant keywords from the provided skill list (including practices such as
-   SDLC, OOP, Agile/Scrum, unit testing, code reviews when present in the list). Never mention a skill that
-   is not in the provided list.
-4. Mention measurable scope only when supplied in the input (e.g. production deployments, freelance delivery).
-5. No buzzword stuffing, no cliches like "team player" or "hard worker".
-6. Return ONLY the paragraph text - no JSON, no quotes, no markdown.`;
-
-const WORK_BULLETS_SYSTEM_PROMPT = `You are an expert technical resume writer specializing in ATS (Applicant Tracking System) optimization.
-Rewrite work-experience bullet points so they score maximum ATS relevance while staying 100% truthful.
-
-CRITICAL RULES:
-1. Return the SAME number of bullets as the input, in the same order.
-2. Start every bullet with a strong action verb (Developed, Engineered, Implemented, Designed, Built,
-   Automated, Optimized, Resolved, Delivered, Integrated).
-3. Be outcome-oriented: state what changed or what was delivered, not just the duty.
-4. Preserve every fact from the original bullet (technologies, platforms, scope). Never invent technologies,
-   employers, or responsibilities that are not in the input.
-5. Keep any numbers/metrics present in the original. If the original has no metric, express scale
-   qualitatively ("multiple", "end-to-end", "cross-platform") - NEVER fabricate specific numbers.
-6. Weave in relevant keywords from the provided skill list only where truthful for that role.
-7. Each bullet 1 to 2 lines. You MUST return ONLY a valid JSON array of strings (no markdown, no labels).`;
+const SUMMARY_SYSTEM_PROMPT = `${policy.evidence}\n\n${policy.summary}`;
+const WORK_BULLETS_SYSTEM_PROMPT = `${policy.evidence}\n\n${policy.work}`;
 
 export async function optimizeSummaryForAts(params: {
   label: string;
   currentSummary: string;
-  yearsOfExperience: number;
   skillKeywords: string[];
   workContext: string;
+  projectContext: string;
+  jobDescription?: string;
 }): Promise<string> {
   const userPrompt = [
     `Target Job Title: ${params.label}`,
-    `Years Of Experience Anchor: ${params.yearsOfExperience}`,
     `Current Summary: ${params.currentSummary}`,
-    `Work History: ${params.workContext}`,
+    `Work Evidence: ${params.workContext}`,
+    `Project Evidence: ${params.projectContext}`,
+    `Job Description (relevance only): ${params.jobDescription || ""}`,
     `Skill Keywords: ${params.skillKeywords.join(", ")}`,
   ].join("\n");
 
   const text = await callGeminiWithFallback(SUMMARY_SYSTEM_PROMPT, userPrompt);
-  return text.trim().replace(/^"|"$/g, "").trim();
+  const summary = text.trim().replace(/^"|"$/g, "").trim();
+  if (!summary || summary.split(/\s+/).length > 80) {
+    throw new Error("AI returned an empty or overly long summary. Add factual work or project evidence and retry.");
+  }
+  return summary;
 }
 
 export async function optimizeWorkHighlightsForAts(params: {
   position: string;
   company: string;
   highlights: string[];
+  summary?: string;
+  target?: WritingTarget;
   skillKeywords: string[];
 }): Promise<string[]> {
   const userPrompt = [
     `Role: ${params.position}`,
     `Company: ${params.company}`,
+    `Role summary: ${params.summary || ""}`,
+    `Target (relevance only): ${JSON.stringify(params.target || {})}`,
     `Current Bullets:\n${params.highlights.map((h) => `- ${h}`).join("\n")}`,
     `Skill Keywords: ${params.skillKeywords.join(", ")}`,
   ].join("\n");
 
-  return extractJsonArray(await callGeminiWithFallback(WORK_BULLETS_SYSTEM_PROMPT, userPrompt));
+  const highlights = extractJsonArray(await callGeminiWithFallback(WORK_BULLETS_SYSTEM_PROMPT, userPrompt));
+  if (highlights.length !== params.highlights.length || highlights.some((h) => h.split(/\s+/).length > 45)) {
+    throw new Error("AI changed the number of work bullets. Your work history was not changed.");
+  }
+  return highlights;
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string, model: string, apiKey: string): Promise<string> {
@@ -174,7 +156,8 @@ async function callGemini(systemPrompt: string, userPrompt: string, model: strin
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       generationConfig: { temperature: 0.3 },
     }),
   });
@@ -187,15 +170,23 @@ async function callGemini(systemPrompt: string, userPrompt: string, model: strin
   return data.candidates[0].content.parts[0].text;
 }
 
-function extractJsonArray(rawText: string): string[] {
+function parseJson(rawText: string) {
   const cleaned = rawText
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/```\s*$/i, "")
     .trim();
 
-  const parsed = JSON.parse(cleaned);
-  if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "string")) {
+  return JSON.parse(cleaned);
+}
+
+function isNonemptyString(item: unknown): item is string {
+  return typeof item === "string" && item.trim().length > 0;
+}
+
+function extractJsonArray(rawText: string): string[] {
+  const parsed = parseJson(rawText);
+  if (!Array.isArray(parsed) || !parsed.every(isNonemptyString)) {
     throw new Error("AI response was not a JSON array of strings.");
   }
   return parsed;

@@ -16,6 +16,9 @@ export interface ResumeBasics {
   profiles: { network: string; username: string; url: string }[];
   targetCompany?: string;
   hideDeclaration?: boolean;
+  /** Used to prioritize supported evidence in AI drafts; never printed. */
+  jobDescription?: string;
+  includeReferences?: boolean;
 }
 
 export interface WorkItem {
@@ -67,11 +70,31 @@ export interface ProjectDriveFolder {
 /** Submodules default to belonging to their parent's project record rather than becoming a standalone one. */
 export type RepositoryType = "MAIN" | "SUBMODULE";
 
+export interface ProjectEvidence {
+  problem?: string;
+  contribution?: string;
+  result?: string;
+  aiUsage?: string;
+}
+
+export interface WritingTarget {
+  targetRole?: string;
+  jobDescription?: string;
+}
+
 export interface ProjectItem {
   name: string;
   description: string;
   highlights: string[];
   links: ProjectLink[];
+  role?: string;
+  startDate?: string;
+  endDate?: string;
+  technologies?: string[];
+  /** Drafting notes; excluded from the rendered CV. */
+  evidence?: ProjectEvidence;
+  /** Defaults to true. Hidden projects stay saved for other applications. */
+  includeInResume?: boolean;
   /** "owner/repo" — the stable identifier used to match this project to a GitHub repo and its Drive folder. Unset for hand-created ("Blank project") entries. */
   repoFullName?: string;
   repositoryType?: RepositoryType;

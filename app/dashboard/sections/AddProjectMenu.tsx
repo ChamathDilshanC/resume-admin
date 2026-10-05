@@ -12,19 +12,22 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button, Field, StringListEditor } from "@/components/FormControls";
 import { PlusIcon, GithubIcon, SparklesIcon } from "@/components/icons";
-import type { ProjectItem } from "@/lib/types";
+import type { ProjectItem, WritingTarget } from "@/lib/types";
+import { ProjectEvidenceFields } from "./ProjectEvidenceFields";
 import type { RepoSummary } from "@/lib/github";
 import { listGithubRepos, generateProjectFromGithubRepo } from "../actions";
 
-type Step = "picker" | "generating" | "review";
+type Step = "picker" | "evidence" | "generating" | "review";
 type VisibilityFilter = "all" | "public" | "private";
 
 export function AddProjectMenu({
   onAddBlank,
   onAddGenerated,
+  target,
 }: {
   onAddBlank: () => void;
   onAddGenerated: (project: ProjectItem) => void;
+  target: WritingTarget;
 }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<Step>("picker");
@@ -34,6 +37,8 @@ export function AddProjectMenu({
   const [visibility, setVisibility] = useState<VisibilityFilter>("all");
   const [draft, setDraft] = useState<ProjectItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<RepoSummary | null>(null);
+  const [notes, setNotes] = useState<Pick<ProjectItem, "role" | "technologies" | "evidence">>({});
 
   function reset() {
     setStep("picker");
@@ -41,6 +46,8 @@ export function AddProjectMenu({
     setError(null);
     setQuery("");
     setVisibility("all");
+    setSelectedRepo(null);
+    setNotes({});
   }
 
   async function openImportDialog() {
@@ -56,17 +63,30 @@ export function AddProjectMenu({
     }
   }
 
-  async function handlePickRepo(repo: RepoSummary) {
+  function handlePickRepo(repo: RepoSummary) {
+    setSelectedRepo(repo);
+    setNotes({});
+    setError(null);
+    setStep("evidence");
+  }
+
+  async function handleGenerate() {
+    if (!selectedRepo) return;
     setStep("generating");
     setError(null);
-    const result = await generateProjectFromGithubRepo(repo.name);
-    if (result.ok) {
-      setDraft(result.project);
-      setStep("review");
-    } else {
-      setError(result.error);
-      setStep("picker");
-      gooeyToast.error("Couldn't generate from this repo", { description: result.error });
+    try {
+      const result = await generateProjectFromGithubRepo(selectedRepo.name, notes, target);
+      if (result.ok) {
+        setDraft(result.project);
+        setStep("review");
+      } else {
+        setError(result.error);
+        setStep("evidence");
+        gooeyToast.error("Couldn't generate from this repo", { description: result.error });
+      }
+    } catch {
+      setError("Could not reach the AI service. Your notes are still here; please try again.");
+      setStep("evidence");
     }
   }
 
@@ -105,8 +125,8 @@ export function AddProjectMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-        <DialogContent className="flex max-h-[88vh] w-[66vw] max-w-[66vw] flex-col overflow-hidden sm:max-w-[66vw]">
+      <Dialog open={open} onOpenChange={(o) => { if (step === "generating") return; setOpen(o); if (!o) reset(); }}>
+        <DialogContent className="flex max-h-[88vh] w-[94vw] max-w-[94vw] flex-col overflow-hidden sm:w-[66vw] sm:max-w-[66vw]">
           <DialogHeader className="shrink-0">
             <DialogTitle>
               {step === "review" ? "Review generated project" : "Import from GitHub"}
@@ -171,6 +191,19 @@ export function AddProjectMenu({
             </div>
           )}
 
+          {step === "evidence" && selectedRepo && (
+            <div className="mt-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+              <p className="text-sm font-semibold">{selectedRepo.name}</p>
+              <p className="text-sm text-gray-500">{selectedRepo.description || "Add the project purpose below."} GitHub languages will be included; add any confirmed frameworks or tools and explain your work.</p>
+              <ProjectEvidenceFields project={notes} onChange={(patch) => setNotes({ ...notes, ...patch })} />
+              {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setStep("picker")}>Back</Button>
+                <Button onClick={handleGenerate}>Generate draft</Button>
+              </div>
+            </div>
+          )}
+
           {step === "generating" && (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10">
               <motion.span
@@ -200,7 +233,7 @@ export function AddProjectMenu({
                 onChange={(v) => setDraft({ ...draft, highlights: v })}
               />
               <div className="flex justify-end gap-2 pt-2">
-                <Button variant="secondary" onClick={() => setStep("picker")}>
+                <Button variant="secondary" onClick={() => setStep("evidence")}>
                   Back
                 </Button>
                 <Button onClick={handleAdd}>Add to Projects</Button>

@@ -3,7 +3,9 @@
 import { Field, StringListEditor, Button, IconButton, SectionHeader } from "@/components/FormControls";
 import { ItemGrid } from "@/components/ItemGrid";
 import { FolderIcon, TrashIcon, PlusIcon } from "@/components/icons";
-import type { ProjectItem } from "@/lib/types";
+import type { ProjectItem, WritingTarget } from "@/lib/types";
+import { ProjectEvidenceFields } from "./ProjectEvidenceFields";
+import { ProjectDraftButton } from "./ProjectDraftButton";
 import { AddProjectMenu } from "./AddProjectMenu";
 import { ProjectPriorityModal } from "./ProjectPriorityModal";
 import { ProjectDriveMockups } from "./ProjectDriveMockups";
@@ -14,10 +16,12 @@ export function ProjectsSection({
   items,
   onChange,
   onSaveProjectPatch,
+  target,
 }: {
   items: ProjectItem[];
   onChange: (items: ProjectItem[]) => void;
   onSaveProjectPatch: (index: number, patch: Partial<ProjectItem>) => Promise<boolean>;
+  target: WritingTarget;
 }) {
   function update(i: number, patch: Partial<ProjectItem>) {
     const next = [...items];
@@ -35,6 +39,7 @@ export function ProjectsSection({
           <div className="flex items-center gap-2">
             <ProjectPriorityModal items={items} onSave={onChange} />
             <AddProjectMenu
+              target={target}
               onAddBlank={() => onChange([{ ...EMPTY_PROJECT }, ...items])}
               onAddGenerated={(project) => onChange([project, ...items])}
             />
@@ -42,8 +47,8 @@ export function ProjectsSection({
         }
       />
       <p className="mb-5 text-sm text-gray-500">
-        Sections you haven&rsquo;t touched this session are refreshed from GitHub on save, so a
-        stale tab can&rsquo;t overwrite projects your pipeline added automatically in the meantime.
+        Put the most relevant projects first. Show the problem, your contribution and a verified
+        result, with technologies connected to actual work. Two or three strong projects are often enough.
       </p>
       <ItemGrid
         items={items}
@@ -54,6 +59,11 @@ export function ProjectsSection({
         onRemove={(i) => onChange(items.filter((_, idx) => idx !== i))}
         renderDetail={(item, i) => (
           <div>
+            <label className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+              <input type="checkbox" checked={item.includeInResume !== false}
+                onChange={(event) => update(i, { includeInResume: event.target.checked })} />
+              Include in generated CV (uncheck to keep it saved for another application)
+            </label>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Name" value={item.name} onChange={(v) => update(i, { name: v })} />
               <Field
@@ -62,6 +72,16 @@ export function ProjectsSection({
                 onChange={(v) => update(i, { description: v })}
               />
             </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Start date (optional)" value={item.startDate || ""} onChange={(startDate) => update(i, { startDate })} placeholder="YYYY-MM" />
+              <Field label="End date (optional)" value={item.endDate || ""} onChange={(endDate) => update(i, { endDate })} placeholder="YYYY-MM or Present" />
+            </div>
+            <details className="my-4 rounded-lg border border-gray-200 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">Project role, technologies & evidence for AI</summary>
+              <div className="mt-3"><ProjectEvidenceFields project={item} onChange={(patch) => update(i, patch)} /></div>
+            </details>
+            <ProjectDraftButton project={item} target={target} onApply={(patch) => update(i, patch)} />
 
             <div className="mt-3">
               <span className="mb-1.5 block text-sm font-medium text-gray-600">Links</span>

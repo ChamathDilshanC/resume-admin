@@ -91,7 +91,7 @@ export function renderTemplatePreview(
   data: ResumeData
 ): string {
   const template = Handlebars.compile(templateHtml);
-  return template(data).replace(
+  return template({ ...data, projects: data.projects?.filter((project) => project.includeInResume !== false) }).replace(
     /<!--\s*INLINE_STYLES\s*-->/,
     () => `<style>${stylesCss}</style>`
   );
