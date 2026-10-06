@@ -1,5 +1,6 @@
 import { Octokit } from "@octokit/rest";
 import type { ResumeData } from "./types";
+import { collectRepositoryContext, type RepositoryContext } from "./repository-context.cjs";
 
 const REPO_OWNER = process.env.RESUME_REPO_OWNER || "ChamathDilshanC";
 // resume-core: pipeline code — PDF workflow dispatch + assets/ (profile photo, logo)
@@ -249,53 +250,18 @@ export async function listUserRepos(accessToken: string): Promise<RepoSummary[]>
   return repos;
 }
 
-function parseSubmoduleOwnerRepo(gitmodulesText: string): { owner: string; repo: string }[] {
-  const urls = [...gitmodulesText.matchAll(/url\s*=\s*(\S+)/g)].map((m) => m[1]);
-  return urls
-    .map((url) => {
-      const match = url.match(/github\.com[:/]([^/]+)\/([^/.]+)(?:\.git)?$/i);
-      return match ? { owner: match[1], repo: match[2] } : null;
-    })
-    .filter((v): v is { owner: string; repo: string } => v !== null);
-}
-
-async function fetchLanguages(octokit: Octokit, owner: string, repo: string): Promise<string[]> {
-  try {
-    const { data } = await octokit.repos.listLanguages({ owner, repo });
-    return Object.keys(data);
-  } catch {
-    return [];
-  }
-}
-
 export async function fetchProjectTechStack(
   accessToken: string,
   owner: string,
   repo: string
-): Promise<{ name: string; description: string; url: string; techStack: string; repoFullName: string }> {
-  const octokit = client(accessToken);
-
-  const { data: repoDetails } = await octokit.repos.get({ owner, repo });
-  const languageSet = new Set(await fetchLanguages(octokit, owner, repo));
-
-  try {
-    const gitmodules = await octokit.repos.getContent({ owner, repo, path: ".gitmodules" });
-    if (!Array.isArray(gitmodules.data) && gitmodules.data.type === "file") {
-      const text = Buffer.from(gitmodules.data.content, "base64").toString("utf8");
-      for (const sub of parseSubmoduleOwnerRepo(text)) {
-        const subLanguages = await fetchLanguages(octokit, sub.owner, sub.repo);
-        subLanguages.forEach((lang) => languageSet.add(lang));
-      }
-    }
-  } catch {
-    // No .gitmodules — not a meta-repo, that's fine.
-  }
-
+): Promise<{ name: string; description: string; url: string; techStack: string; repoFullName: string; context: RepositoryContext }> {
+  const context = await collectRepositoryContext({ owner, repo, token: accessToken });
   return {
-    name: repoDetails.name,
-    description: repoDetails.description || "",
-    url: repoDetails.html_url,
-    techStack: [...languageSet].join(", "),
-    repoFullName: repoDetails.full_name,
+    name: context.root.name,
+    description: context.root.description,
+    url: context.root.url,
+    techStack: [...new Set(context.repositories.flatMap((r) => r.languages))].join(", "),
+    repoFullName: context.root.fullName,
+    context,
   };
 }

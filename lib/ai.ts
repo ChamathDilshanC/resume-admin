@@ -1,7 +1,8 @@
 import policy from "./resume-writing-policy.json";
 import type { ProjectItem, WritingTarget } from "./types";
+import type { RepositoryContext } from "./repository-context.cjs";
 
-const PROJECT_SYSTEM_PROMPT = `${policy.evidence}\n\n${policy.project}`;
+const PROJECT_SYSTEM_PROMPT = `${policy.evidence}\n\n${policy.repository}\n\n${policy.project}`;
 
 class AIRequestError extends Error {
   constructor(
@@ -71,10 +72,12 @@ async function callGeminiWithFallback(systemPrompt: string, userPrompt: string):
 
 export async function generateProjectContent(
   project: ProjectItem,
-  target: WritingTarget = {}
+  target: WritingTarget = {},
+  repositoryContext?: RepositoryContext
 ): Promise<Pick<ProjectItem, "description" | "highlights">> {
   const raw = await callGeminiWithFallback(PROJECT_SYSTEM_PROMPT, JSON.stringify({
     target,
+    repositoryContext,
     project: {
       name: project.name, description: project.description, role: project.role,
       technologies: (project.technologies || []).map((t) => t.trim()).filter(Boolean), highlights: project.highlights,

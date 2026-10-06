@@ -33,12 +33,15 @@ async function main() {
   const project = { name: "Release Tool", description: "Package release automation", highlights: [], links: [],
     technologies: ["Shell"], role: "Contributor", evidence: { contribution: "Wrote shell release scripts", result: "Published packages" } };
   const target = { targetRole: "DevOps Engineer", jobDescription: "Deploy packages" };
+  const context = { root: { fullName: "candidate/release", name: "Release Tool" }, repositories: [], warnings: ["One private submodule was not accessible."],
+    documents: [{ repository: "candidate/release", path: "README.md", ref: "pinned", depth: 0, url: "https://github.com/candidate/release/blob/pinned/README.md", truncated: false, text: "Uses shell scripts for package releases." }] };
   const draft = { description: "Package release automation.", highlights: ["Wrote shell scripts to publish packages."] };
   responseText = JSON.stringify(draft);
-  assert.deepEqual(JSON.parse(JSON.stringify(await ai.generateProjectContent(project, target))), draft);
+  assert.deepEqual(JSON.parse(JSON.stringify(await ai.generateProjectContent(project, target, context))), draft);
   const request = JSON.parse(lastRequest.contents[0].parts[0].text);
   assert.deepEqual(request.target, target);
   assert.deepEqual(request.project.evidence, project.evidence);
+  assert.deepEqual(request.repositoryContext, context);
   assert(lastRequest.systemInstruction.parts[0].text.includes(policy.evidence));
   for (const bad of ['[]', '{"description":"x","highlights":[null]}', '{"description":"","highlights":[]}',
     JSON.stringify({ ...draft, highlights: [" "] }), JSON.stringify({ ...draft, highlights: Array(4).fill("Extra") })]) {
@@ -64,9 +67,10 @@ async function main() {
     "next-auth": { getServerSession: async () => ({ accessToken: "offline" }) },
     "next/headers": {}, "@/lib/auth": {}, "@/lib/preview": {}, "@/lib/google-drive": {},
     "@/lib/google-drive-oauth": {}, "@/lib/crypto": {},
+    "@/lib/repository-context.cjs": require("../lib/repository-context.cjs"),
     "@/lib/github": { fetchProjectTechStack: async () => ({ name: "Release Tool", description: "Packages", techStack: "Shell",
-      repoFullName: "candidate/release", url: "https://example.com/release" }) },
-    "@/lib/ai": { generateProjectContent: async (p, t) => { captured = { project: p, target: t }; return draft; } },
+      repoFullName: "candidate/release", url: "https://example.com/release", context }) },
+    "@/lib/ai": { generateProjectContent: async (p, t, c) => { captured = { project: p, target: t, context: c }; return draft; } },
   });
   const imported = await actions.generateProjectFromGithubRepo("release", { role: project.role, technologies: [" Shell ", "", "GitHub Actions"], evidence: project.evidence }, target);
   assert.equal(imported.ok, true);
@@ -75,8 +79,15 @@ async function main() {
   assert.deepEqual(captured.target, target);
   assert.equal(imported.project.description, draft.description);
   assert.equal(imported.project.repoFullName, "candidate/release");
+  assert.equal(imported.project.repositoryResearch.sources.length, 1);
+  assert.deepEqual(captured.context, context);
   const edited = await actions.draftProjectAction(project, target);
   assert.equal(edited.ok, true);
+  assert.equal(captured.context, undefined, "blank projects still support candidate evidence only");
+  const linked = await actions.draftProjectAction({ ...project, links: [{ url: "https://github.com/candidate/release" }] }, target);
+  assert.equal(linked.ok, true);
+  assert.deepEqual(captured.context, context, "existing linked projects fetch README context again");
+  assert.equal(linked.draft.repositoryResearch.warnings.length, 1);
   console.log("PASS: admin AI evidence/target transport, validation, work count, summary, GitHub import and existing-project drafts");
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

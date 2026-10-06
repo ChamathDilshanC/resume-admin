@@ -39,10 +39,15 @@ API using your own OAuth session, and PDF rendering reuses the
   Projects as 2-column cards, Skills/Education/Certificates/References up to
   3 columns — instead of one long stacked form; click any card for a
   full-detail view
-- **Add project → Import from GitHub** — pick any repo you own, and an AI
-  step drafts 2–3 ATS-style bullet points from its description/languages
-  before you commit the entry (same AI step `resume-core`'s automated
-  pipeline uses)
+- **Add project → Import from GitHub** — reads the main repo's README files
+  and recursively reads submodule READMEs at their pinned commits. AI combines
+  this documentation with your contribution notes and target role to draft a
+  concise description and 1–3 ATS-friendly highlights. Review the text, source
+  links and any missing/truncated-source warnings before adding the project.
+- **AI draft description & highlights** — existing GitHub-linked projects
+  refresh their README sources on every draft. Blank projects use your own notes.
+  Technical terminology comes from the READMEs; personal ownership and results
+  must come from your evidence. Raw README text is not saved in your CV data.
 - **Drag-and-drop photo upload** straight to `resume-core/assets/`, with a
   live preview proxied through a private, authenticated API route
   (`/api/asset`) so the private repo image never needs a public URL

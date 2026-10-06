@@ -6,14 +6,17 @@ import { Button, TextArea, StringListEditor } from "@/components/FormControls";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { ProjectItem, WritingTarget } from "@/lib/types";
 import { draftProjectAction } from "../actions";
+import { RepositorySources } from "./RepositorySources";
+
+type Draft = Pick<ProjectItem, "description" | "highlights" | "repositoryResearch">;
 
 export function ProjectDraftButton({ project, target, onApply }: {
   project: ProjectItem;
   target: WritingTarget;
-  onApply: (patch: Pick<ProjectItem, "description" | "highlights">) => void;
+  onApply: (patch: Draft) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState<Pick<ProjectItem, "description" | "highlights"> | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const source = useRef("");
   async function generate() {
     setBusy(true);
@@ -38,13 +41,14 @@ export function ProjectDraftButton({ project, target, onApply }: {
   }
   return <>
     <Button variant="secondary" onClick={generate} disabled={busy}>
-      {busy ? "Drafting..." : "AI draft description & highlights"}
+      {busy ? "Reading READMEs & drafting..." : "AI draft description & highlights"}
     </Button>
     <Dialog open={draft !== null} onOpenChange={(open) => { if (!open) setDraft(null); }}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Review project draft</DialogTitle></DialogHeader>
         <p className="text-sm text-gray-500">Check your contribution, technologies and results. Apply the draft when it matches your actual work.</p>
         {draft && <>
+          <RepositorySources research={draft.repositoryResearch} />
           <TextArea label="Description" value={draft.description} onChange={(description) => setDraft({ ...draft, description })} />
           <StringListEditor label="Highlights" items={draft.highlights} onChange={(highlights) => setDraft({ ...draft, highlights })} />
           <div className="flex justify-end gap-2">

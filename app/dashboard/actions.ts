@@ -21,6 +21,7 @@ import {
 import { renderTemplatePreview } from "@/lib/preview";
 import { generateProjectContent, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
 import type { WritingTarget } from "@/lib/types";
+import { researchSummary } from "@/lib/repository-context.cjs";
 import { listFolderFiles, uploadFileToFolder, renameFile, trashFile } from "@/lib/google-drive";
 import { getFreshAccessToken } from "@/lib/google-drive-oauth";
 import { decrypt } from "@/lib/crypto";
@@ -309,7 +310,7 @@ export async function generateProjectFromGithubRepo(
     const accessToken = await requireAccessToken();
     const owner = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
 
-    const { name, description, url, techStack, repoFullName } = await fetchProjectTechStack(
+    const { name, description, url, techStack, repoFullName, context } = await fetchProjectTechStack(
       accessToken,
       owner,
       repoName
@@ -325,9 +326,10 @@ export async function generateProjectFromGithubRepo(
       role: notes.role,
       technologies: [...new Set([...techStack.split(","), ...(notes.technologies || [])].map((t) => t.trim()).filter(Boolean))],
       evidence: notes.evidence,
+      repositoryResearch: researchSummary(context),
     };
 
-    Object.assign(project, await generateProjectContent(project, target));
+    Object.assign(project, await generateProjectContent(project, target, context));
 
     return { ok: true, project };
   } catch (error) {
@@ -338,10 +340,22 @@ export async function generateProjectFromGithubRepo(
 export async function draftProjectAction(
   project: ProjectItem,
   target: WritingTarget = {}
-): Promise<{ ok: true; draft: Pick<ProjectItem, "description" | "highlights"> } | { ok: false; error: string }> {
+): Promise<{ ok: true; draft: Pick<ProjectItem, "description" | "highlights" | "repositoryResearch"> } | { ok: false; error: string }> {
   try {
-    await requireAccessToken();
-    return { ok: true, draft: await generateProjectContent(project, target) };
+    const accessToken = await requireAccessToken();
+    // Existing/manual projects can already have a GitHub link but no stored repo identity.
+    const linkedRepo = project.repoFullName || project.links
+      .map((link) => link.url.match(/^https:\/\/github\.com\/([A-Za-z0-9-]+\/[A-Za-z0-9_.-]+)\/?(?:[?#].*)?$/i)?.[1])
+      .find(Boolean)?.replace(/\.git$/i, "");
+    let context;
+    if (linkedRepo) {
+      const parts = linkedRepo.split("/");
+      if (parts.length !== 2) throw new Error("Use an owner/repository GitHub identity for this project.");
+      context = (await fetchProjectTechStack(accessToken, parts[0], parts[1])).context;
+    }
+    return { ok: true, draft: { ...await generateProjectContent(project, target, context),
+      repositoryResearch: context ? researchSummary(context) : undefined,
+    } };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not draft project content" };
   }

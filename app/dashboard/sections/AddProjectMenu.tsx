@@ -14,6 +14,7 @@ import { Button, Field, StringListEditor } from "@/components/FormControls";
 import { PlusIcon, GithubIcon, SparklesIcon } from "@/components/icons";
 import type { ProjectItem, WritingTarget } from "@/lib/types";
 import { ProjectEvidenceFields } from "./ProjectEvidenceFields";
+import { RepositorySources } from "./RepositorySources";
 import type { RepoSummary } from "@/lib/github";
 import { listGithubRepos, generateProjectFromGithubRepo } from "../actions";
 
@@ -194,7 +195,7 @@ export function AddProjectMenu({
           {step === "evidence" && selectedRepo && (
             <div className="mt-2 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
               <p className="text-sm font-semibold">{selectedRepo.name}</p>
-              <p className="text-sm text-gray-500">{selectedRepo.description || "Add the project purpose below."} GitHub languages will be included; add any confirmed frameworks or tools and explain your work.</p>
+              <p className="text-sm text-gray-500">{selectedRepo.description || "Add the project purpose below."} We read this repository and its submodule READMEs for project details and technical terminology. Add your personal contribution and confirmed results below.</p>
               <ProjectEvidenceFields project={notes} onChange={(patch) => setNotes({ ...notes, ...patch })} />
               {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
               <div className="flex justify-end gap-2">
@@ -213,12 +214,13 @@ export function AddProjectMenu({
               >
                 <SparklesIcon className="h-3.5 w-3.5 text-brand" />
               </motion.span>
-              <p className="text-sm text-gray-500">Fetching repo details and generating bullet points...</p>
+              <p className="text-sm text-gray-500">Reading repository and submodule READMEs, then drafting your description and highlights...</p>
             </div>
           )}
 
           {step === "review" && draft && (
             <div className="mt-2 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+              <RepositorySources research={draft.repositoryResearch} />
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
                 <Field

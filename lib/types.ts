@@ -1,3 +1,5 @@
+import type { RepositoryResearch } from "./repository-context.cjs";
+
 export interface ResumeBasics {
   name: string;
   label: string;
@@ -95,6 +97,8 @@ export interface ProjectItem {
   evidence?: ProjectEvidence;
   /** Defaults to true. Hidden projects stay saved for other applications. */
   includeInResume?: boolean;
+  /** Sources and collection gaps for review; raw README text is never saved in resume.json. */
+  repositoryResearch?: RepositoryResearch;
   /** "owner/repo" — the stable identifier used to match this project to a GitHub repo and its Drive folder. Unset for hand-created ("Blank project") entries. */
   repoFullName?: string;
   repositoryType?: RepositoryType;

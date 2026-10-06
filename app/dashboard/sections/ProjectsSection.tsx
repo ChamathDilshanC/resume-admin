@@ -6,6 +6,7 @@ import { FolderIcon, TrashIcon, PlusIcon } from "@/components/icons";
 import type { ProjectItem, WritingTarget } from "@/lib/types";
 import { ProjectEvidenceFields } from "./ProjectEvidenceFields";
 import { ProjectDraftButton } from "./ProjectDraftButton";
+import { RepositorySources } from "./RepositorySources";
 import { AddProjectMenu } from "./AddProjectMenu";
 import { ProjectPriorityModal } from "./ProjectPriorityModal";
 import { ProjectDriveMockups } from "./ProjectDriveMockups";
@@ -82,6 +83,7 @@ export function ProjectsSection({
               <div className="mt-3"><ProjectEvidenceFields project={item} onChange={(patch) => update(i, patch)} /></div>
             </details>
             <ProjectDraftButton project={item} target={target} onApply={(patch) => update(i, patch)} />
+            <div className="mt-3"><RepositorySources research={item.repositoryResearch} /></div>
 
             <div className="mt-3">
               <span className="mb-1.5 block text-sm font-medium text-gray-600">Links</span>
