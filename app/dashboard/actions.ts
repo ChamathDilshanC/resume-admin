@@ -19,9 +19,10 @@ import {
   type TemplateSummary,
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
-import { generateProjectContent, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
+import { generateProjectContent, suggestProjectEvidence, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
 import type { WritingTarget } from "@/lib/types";
 import { researchSummary } from "@/lib/repository-context.cjs";
+import type { RepositoryContext } from "@/lib/repository-context.cjs";
 import { listFolderFiles, uploadFileToFolder, renameFile, trashFile } from "@/lib/google-drive";
 import { getFreshAccessToken } from "@/lib/google-drive-oauth";
 import { decrypt } from "@/lib/crypto";
@@ -313,6 +314,35 @@ function skillKeywordsOf(data: ResumeData): string[] {
   return data.skills.flatMap((s) => s.keywords).slice(0, 60);
 }
 
+type EvidenceFields = Pick<ProjectItem, "role" | "technologies" | "evidence">;
+
+// Best-effort: fills only the evidence fields the user left empty from a
+// README-based suggestion, so Generate draft / AI draft work even when the
+// separate Auto-fill step was skipped. A short AI budget keeps it from eating
+// the time the draft itself needs; on any failure the input comes back as-is.
+async function withSuggestedEvidence(current: EvidenceFields, context: RepositoryContext): Promise<EvidenceFields> {
+  const e = current.evidence || {};
+  const filled = (value?: string) => Boolean(value?.trim());
+  const complete = filled(current.role) && (current.technologies || []).some(filled) &&
+    filled(e.problem) && filled(e.contribution) && filled(e.result) && filled(e.aiUsage);
+  if (complete) return current;
+  try {
+    const s = await suggestProjectEvidence(context, 12_000);
+    return {
+      role: filled(current.role) ? current.role : s.role || current.role,
+      technologies: (current.technologies || []).some(filled) ? current.technologies : s.technologies,
+      evidence: {
+        problem: filled(e.problem) ? e.problem : s.evidence.problem,
+        contribution: filled(e.contribution) ? e.contribution : s.evidence.contribution,
+        result: filled(e.result) ? e.result : s.evidence.result,
+        aiUsage: filled(e.aiUsage) ? e.aiUsage : s.evidence.aiUsage,
+      },
+    };
+  } catch {
+    return current;
+  }
+}
+
 export async function generateProjectFromGithubRepo(
   repoName: string,
   notes: Pick<ProjectItem, "role" | "technologies" | "evidence"> = {},
@@ -322,24 +352,26 @@ export async function generateProjectFromGithubRepo(
     const accessToken = await requireAccessToken();
     const owner = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
 
-    const { name, description, url, techStack, repoFullName, startDate, endDate, context } = await fetchProjectTechStack(
+    const { name, description, techStack, repoFullName, startDate, endDate, liveUrl, context } = await fetchProjectTechStack(
       accessToken,
       owner,
       repoName
     );
 
+    const evidenceNotes = await withSuggestedEvidence(notes, context);
     const project: ProjectItem = {
       name,
       description,
       highlights: [],
-      links: [{ label: name, url }],
+      // Only the deployed frontend is linked; no homepage on the repo means no link.
+      links: liveUrl ? [{ label: "Live site", url: liveUrl }] : [],
       repoFullName,
       startDate,
       endDate,
       repositoryType: "MAIN",
-      role: notes.role,
-      technologies: [...new Set([...techStack.split(","), ...(notes.technologies || [])].map((t) => t.trim()).filter(Boolean))],
-      evidence: notes.evidence,
+      role: evidenceNotes.role,
+      technologies: [...new Set([...techStack.split(","), ...(evidenceNotes.technologies || [])].map((t) => t.trim()).filter(Boolean))],
+      evidence: evidenceNotes.evidence,
       repositoryResearch: researchSummary(context),
     };
 
@@ -354,7 +386,7 @@ export async function generateProjectFromGithubRepo(
 export async function draftProjectAction(
   project: ProjectItem,
   target: WritingTarget = {}
-): Promise<{ ok: true; draft: Pick<ProjectItem, "description" | "highlights" | "repositoryResearch" | "startDate" | "endDate"> } | { ok: false; error: string }> {
+): Promise<{ ok: true; draft: Pick<ProjectItem, "description" | "highlights" | "repositoryResearch" | "startDate" | "endDate" | "role" | "technologies" | "evidence"> } | { ok: false; error: string }> {
   try {
     const accessToken = await requireAccessToken();
     // Existing/manual projects can already have a GitHub link but no stored repo identity.
@@ -372,8 +404,11 @@ export async function draftProjectAction(
       if (!project.startDate && fetched.startDate) dates.startDate = fetched.startDate;
       if (!project.endDate && fetched.endDate) dates.endDate = fetched.endDate;
     }
-    return { ok: true, draft: { ...await generateProjectContent(project, target, context),
+    // Same best-effort fill of empty evidence fields, so highlights are written from it too.
+    const evidence = context ? await withSuggestedEvidence(project, context) : project;
+    return { ok: true, draft: { ...await generateProjectContent({ ...project, ...evidence }, target, context),
       repositoryResearch: context ? researchSummary(context) : undefined,
+      ...(context ? { role: evidence.role, technologies: evidence.technologies, evidence: evidence.evidence } : {}),
       ...dates,
     } };
   } catch (error) {

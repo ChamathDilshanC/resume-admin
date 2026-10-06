@@ -42,7 +42,7 @@ function getApiKeys(): string[] {
 
 const TOTAL_AI_BUDGET_MS = 40_000;
 
-async function callGeminiWithFallback(systemPrompt: string, userPrompt: string): Promise<string> {
+async function callGeminiWithFallback(systemPrompt: string, userPrompt: string, budgetMs = TOTAL_AI_BUDGET_MS): Promise<string> {
   const apiKeys = getApiKeys();
   if (apiKeys.length === 0) {
     throw new Error("AI_API_KEY is not configured for resume-admin.");
@@ -55,7 +55,7 @@ async function callGeminiWithFallback(systemPrompt: string, userPrompt: string):
 
   // Overall budget so a busy/rate-limited AI service surfaces as an error the
   // user can retry, instead of the UI spinning past the host's time limit.
-  const deadline = Date.now() + TOTAL_AI_BUDGET_MS;
+  const deadline = Date.now() + budgetMs;
   let lastError: unknown;
   for (const model of models) {
     for (const apiKey of apiKeys) {
@@ -120,9 +120,10 @@ Rules:
 - Use "" for anything the READMEs do not support. Be concise and factual. The developer will review and edit everything.`;
 
 export async function suggestProjectEvidence(
-  repositoryContext: RepositoryContext
+  repositoryContext: RepositoryContext,
+  budgetMs?: number
 ): Promise<{ role: string; technologies: string[]; evidence: Required<ProjectEvidence> }> {
-  const raw = await callGeminiWithFallback(EVIDENCE_SYSTEM_PROMPT, JSON.stringify({ repositoryContext }));
+  const raw = await callGeminiWithFallback(EVIDENCE_SYSTEM_PROMPT, JSON.stringify({ repositoryContext }), budgetMs);
   const parsed = parseJson(raw);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("AI returned an invalid suggestion. Please try again.");

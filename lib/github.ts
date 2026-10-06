@@ -250,22 +250,55 @@ export async function listUserRepos(accessToken: string): Promise<RepoSummary[]>
   return repos;
 }
 
+function normalizeWebUrl(value: string | null | undefined): string | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// First submodule repo with a homepage set, preferring ones named "frontend".
+async function findSubmoduleLiveUrl(accessToken: string, repositories: { repository: string }[]): Promise<string | undefined> {
+  const octokit = client(accessToken);
+  const candidates = repositories
+    .map((r) => r.repository)
+    .sort((a, b) => Number(/frontend/i.test(b)) - Number(/frontend/i.test(a)))
+    .slice(0, 8);
+  const urls = await Promise.all(candidates.map(async (full) => {
+    const [owner, repo] = full.split("/");
+    try {
+      return normalizeWebUrl((await octokit.repos.get({ owner, repo })).data.homepage);
+    } catch {
+      return undefined;
+    }
+  }));
+  return urls.find(Boolean);
+}
+
 export async function fetchProjectTechStack(
   accessToken: string,
   owner: string,
   repo: string
-): Promise<{ name: string; description: string; url: string; techStack: string; repoFullName: string; startDate?: string; endDate?: string; context: RepositoryContext }> {
+): Promise<{ name: string; description: string; url: string; techStack: string; repoFullName: string; startDate?: string; endDate?: string; liveUrl?: string; context: RepositoryContext }> {
   const context = await collectRepositoryContext({ owner, repo, token: accessToken });
   // Repo creation / last push as the project's start / end (YYYY-MM). Best effort.
   let startDate: string | undefined;
   let endDate: string | undefined;
+  let liveUrl: string | undefined;
   try {
     const { data } = await client(accessToken).repos.get({ owner, repo });
     startDate = data.created_at?.slice(0, 7) || undefined;
     endDate = data.pushed_at?.slice(0, 7) || undefined;
+    liveUrl = normalizeWebUrl(data.homepage);
   } catch {
     // Dates are optional; leave them for the user to fill in.
   }
+  // Monorepos keep the deployed site on a frontend submodule's "Website" field.
+  if (!liveUrl) liveUrl = await findSubmoduleLiveUrl(accessToken, context.repositories.slice(1));
   return {
     name: context.root.name,
     description: context.root.description,
@@ -274,6 +307,7 @@ export async function fetchProjectTechStack(
     repoFullName: context.root.fullName,
     startDate,
     endDate,
+    liveUrl,
     context,
   };
 }
