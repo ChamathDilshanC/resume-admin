@@ -3,6 +3,7 @@
 import { Field, StringListEditor, Button, IconButton, SectionHeader } from "@/components/FormControls";
 import { ItemGrid } from "@/components/ItemGrid";
 import { FolderIcon, TrashIcon, PlusIcon } from "@/components/icons";
+import { useState } from "react";
 import type { ProjectItem, WritingTarget } from "@/lib/types";
 import { ProjectEvidenceFields } from "./ProjectEvidenceFields";
 import { ProjectDraftButton } from "./ProjectDraftButton";
@@ -10,6 +11,7 @@ import { RepositorySources } from "./RepositorySources";
 import { AddProjectMenu } from "./AddProjectMenu";
 import { ProjectPriorityModal } from "./ProjectPriorityModal";
 import { ProjectDriveMockups } from "./ProjectDriveMockups";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 const EMPTY_PROJECT: ProjectItem = { name: "", description: "", highlights: [], links: [] };
 
@@ -26,6 +28,8 @@ export function ProjectsSection({
   onPersistProjects: (items: ProjectItem[]) => Promise<boolean>;
   target: WritingTarget;
 }) {
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+
   function update(i: number, patch: Partial<ProjectItem>) {
     const next = [...items];
     next[i] = { ...next[i], ...patch };
@@ -40,7 +44,7 @@ export function ProjectsSection({
         title="Projects"
         action={
           <div className="flex items-center gap-2">
-            <ProjectPriorityModal items={items} onSave={onChange} />
+            <ProjectPriorityModal items={items} onSave={(next) => void onPersistProjects(next)} />
             <AddProjectMenu
               target={target}
               onAddBlank={() => onChange([{ ...EMPTY_PROJECT }, ...items])}
@@ -59,7 +63,7 @@ export function ProjectsSection({
         color="teal"
         getTitle={(item) => item.name}
         getSubtitle={(item) => item.description}
-        onRemove={(i) => onChange(items.filter((_, idx) => idx !== i))}
+        onRemove={(i) => setPendingDelete(i)}
         renderDetail={(item, i) => (
           <div>
             <label className="mb-4 flex items-center gap-2 text-sm text-gray-600">
@@ -145,6 +149,19 @@ export function ProjectsSection({
             />
           </div>
         )}
+      />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+        title="Delete this project?"
+        description={`"${pendingDelete !== null ? items[pendingDelete]?.name || "Untitled project" : ""}" will be removed from resume.json right away. This can't be undone from here.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (pendingDelete === null) return;
+          // Committed immediately, like Add: a local-only delete came back after a refresh.
+          void onPersistProjects(items.filter((_, idx) => idx !== pendingDelete));
+        }}
       />
     </div>
   );

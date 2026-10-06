@@ -18,7 +18,7 @@ import {
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/sidebar-01/app-sidebar";
 import type { ResumeNavItem } from "@/components/sidebar-01/types";
-import { saveResume } from "./actions";
+import { saveResume, regeneratePdfAction } from "./actions";
 import { BasicsSection } from "./sections/BasicsSection";
 import { WorkSection } from "./sections/WorkSection";
 import { ProjectsSection } from "./sections/ProjectsSection";
@@ -153,8 +153,36 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
 
   // Warn before a refresh/close would silently drop unsaved edits.
   const savedSnapshot = useRef(JSON.stringify(initialData));
+  // Last successfully saved data. saveResume compares against this (not the
+  // page-load copy) to decide which sections this tab changed, so editing a
+  // section and then reverting it after a save still counts as a change.
+  const baseline = useRef(initialData);
   const latestData = useRef(data);
   latestData.current = data;
+  const saving = useRef(false);
+  const failedSnapshot = useRef<string | null>(null);
+  const [saveTick, setSaveTick] = useState(0);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [autoSave, setAutoSave] = useState(true);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("resume-admin-autosave") === "off") setAutoSave(false);
+    } catch {
+      // Storage unavailable: keep the default.
+    }
+  }, []);
+
+  function toggleAutoSave(next: boolean) {
+    setAutoSave(next);
+    try {
+      localStorage.setItem("resume-admin-autosave", next ? "on" : "off");
+    } catch {
+      // Preference just will not persist.
+    }
+  }
+
   useEffect(() => {
     function warnIfUnsaved(event: BeforeUnloadEvent) {
       if (JSON.stringify(latestData.current) !== savedSnapshot.current) event.preventDefault();
@@ -163,24 +191,80 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
     return () => window.removeEventListener("beforeunload", warnIfUnsaved);
   }, []);
 
-  async function saveNow(nextData: ResumeData, options: { regeneratePdf?: boolean } = {}): Promise<boolean> {
-    const { regeneratePdf = true } = options;
-    const result = await saveResume(nextData, initialData, { regeneratePdf });
-    if (result.ok) {
-      savedSnapshot.current = JSON.stringify(nextData);
-      gooeyToast.success("Saved", {
-        description: regeneratePdf ? "resume.json committed — PDF is regenerating." : "resume.json committed.",
-      });
-      return true;
+  async function saveNow(
+    nextData: ResumeData,
+    options: { regeneratePdf?: boolean; silent?: boolean } = {}
+  ): Promise<boolean> {
+    const { regeneratePdf = true, silent = false } = options;
+    saving.current = true;
+    setSaveState("saving");
+    try {
+      const result = await saveResume(nextData, baseline.current, { regeneratePdf });
+      if (result.ok) {
+        savedSnapshot.current = JSON.stringify(nextData);
+        baseline.current = nextData;
+        failedSnapshot.current = null;
+        setSaveState("saved");
+        if (!silent) {
+          gooeyToast.success("Saved", {
+            description: regeneratePdf ? "resume.json committed — PDF is regenerating." : "resume.json committed.",
+          });
+        }
+        return true;
+      }
+      failedSnapshot.current = JSON.stringify(nextData);
+      setSaveState("error");
+      gooeyToast.error("Save failed", { description: result.error });
+      return false;
+    } catch {
+      failedSnapshot.current = JSON.stringify(nextData);
+      setSaveState("error");
+      gooeyToast.error("Save failed", { description: "Could not reach the server. Your edits are still here." });
+      return false;
+    } finally {
+      saving.current = false;
+      setSaveTick((tick) => tick + 1);
     }
-    gooeyToast.error("Save failed", { description: result.error });
-    return false;
   }
+
+  // Auto-save: commit shortly after the last edit (no PDF run). A failed
+  // snapshot is not retried until the data changes again, so an error cannot
+  // turn into a retry loop.
+  useEffect(() => {
+    if (!autoSave || saving.current) return;
+    const snapshot = JSON.stringify(data);
+    if (snapshot === savedSnapshot.current || snapshot === failedSnapshot.current) return;
+    const timer = setTimeout(() => {
+      if (!saving.current) void saveNow(latestData.current, { regeneratePdf: false, silent: true });
+    }, 2000);
+    return () => clearTimeout(timer);
+    // saveNow only reads refs and stable setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, autoSave, saveTick]);
 
   function handleSave() {
     startTransition(async () => {
-      await saveNow(data);
+      await saveNow(data, { regeneratePdf: false });
     });
+  }
+
+  // The PDF is built from resume.json on GitHub, so unsaved edits are saved
+  // first; otherwise the PDF would come out from stale content.
+  async function handleRegeneratePdf() {
+    setPdfBusy(true);
+    try {
+      if (JSON.stringify(latestData.current) !== savedSnapshot.current) {
+        if (!(await saveNow(latestData.current, { regeneratePdf: false, silent: true }))) return;
+      }
+      const result = await regeneratePdfAction();
+      if (result.ok) {
+        gooeyToast.success("PDF is regenerating", { description: "resume.json is saved; the new PDF will be ready shortly." });
+      } else {
+        gooeyToast.error("Could not start PDF regeneration", { description: result.error });
+      }
+    } finally {
+      setPdfBusy(false);
+    }
   }
 
   // Drive sync reads resume.json as it exists on GitHub — an unsaved local
@@ -221,20 +305,32 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
             <SidebarTrigger />
             <h1 className="text-base font-bold text-gray-900">{TAB_TITLES[activeTab]}</h1>
           </div>
-          <Button onClick={handleSave} disabled={isPending}>
-            {isPending ? (
-              <span className="flex items-center gap-2">
-                <motion.span
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-                  className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white"
-                />
-                Saving
-              </span>
-            ) : (
-              "Save & Regenerate PDF"
-            )}
-          </Button>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs text-gray-500 sm:inline" aria-live="polite">
+              {saveState === "saving" ? "Saving..." : saveState === "saved" ? "All changes saved" : saveState === "error" ? "Save failed" : ""}
+            </span>
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-gray-600">
+              <input type="checkbox" checked={autoSave} onChange={(event) => toggleAutoSave(event.target.checked)} />
+              Auto-save
+            </label>
+            <Button variant="secondary" onClick={handleSave} disabled={isPending || saveState === "saving"}>
+              {isPending ? "Saving..." : "Save"}
+            </Button>
+            <Button onClick={handleRegeneratePdf} disabled={pdfBusy || saveState === "saving"}>
+              {pdfBusy ? (
+                <span className="flex items-center gap-2">
+                  <motion.span
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                    className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white"
+                  />
+                  Working
+                </span>
+              ) : (
+                "Regenerate PDF"
+              )}
+            </Button>
+          </div>
         </header>
 
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">

@@ -134,6 +134,18 @@ function reconcileProjectDriveFields(
   });
 }
 
+// Kicks off resume-core's PDF workflow on whatever resume.json currently is
+// on GitHub. Saving is a separate step, so the PDF run is its own button.
+export async function regeneratePdfAction(): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const accessToken = await requireAccessToken();
+    await triggerPdfRegeneration(accessToken);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
 export async function saveResume(
   data: ResumeData,
   initialData: ResumeData,
