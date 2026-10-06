@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { gooeyToast } from "goey-toast";
 import type { ResumeData, ProjectItem } from "@/lib/types";
@@ -151,10 +151,23 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
 
   const navItems = buildNavItems(data);
 
+  // Warn before a refresh/close would silently drop unsaved edits.
+  const savedSnapshot = useRef(JSON.stringify(initialData));
+  const latestData = useRef(data);
+  latestData.current = data;
+  useEffect(() => {
+    function warnIfUnsaved(event: BeforeUnloadEvent) {
+      if (JSON.stringify(latestData.current) !== savedSnapshot.current) event.preventDefault();
+    }
+    window.addEventListener("beforeunload", warnIfUnsaved);
+    return () => window.removeEventListener("beforeunload", warnIfUnsaved);
+  }, []);
+
   async function saveNow(nextData: ResumeData, options: { regeneratePdf?: boolean } = {}): Promise<boolean> {
     const { regeneratePdf = true } = options;
     const result = await saveResume(nextData, initialData, { regeneratePdf });
     if (result.ok) {
+      savedSnapshot.current = JSON.stringify(nextData);
       gooeyToast.success("Saved", {
         description: regeneratePdf ? "resume.json committed — PDF is regenerating." : "resume.json committed.",
       });
@@ -183,6 +196,15 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
     // This save exists purely to make sure resume-core's sync workflow has
     // something to read — it isn't a content edit the rendered PDF needs to
     // reflect, so don't fire off (and queue behind) a PDF regeneration too.
+    return saveNow(nextData, { regeneratePdf: false });
+  }
+
+  // An imported project must survive a refresh without needing the
+  // "Save & Regenerate PDF" click, so it is committed right away. No PDF run:
+  // the user's explicit save still does that.
+  async function persistProjects(projects: ProjectItem[]): Promise<boolean> {
+    const nextData = { ...data, projects };
+    setData(nextData);
     return saveNow(nextData, { regeneratePdf: false });
   }
 
@@ -245,6 +267,7 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
                     items={data.projects}
                     onChange={(projects) => setData({ ...data, projects })}
                     onSaveProjectPatch={saveProjectPatch}
+                    onPersistProjects={persistProjects}
                   />
                 )}
                 {activeTab === "skills" && (

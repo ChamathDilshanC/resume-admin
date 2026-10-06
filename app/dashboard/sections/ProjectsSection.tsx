@@ -17,11 +17,13 @@ export function ProjectsSection({
   items,
   onChange,
   onSaveProjectPatch,
+  onPersistProjects,
   target,
 }: {
   items: ProjectItem[];
   onChange: (items: ProjectItem[]) => void;
   onSaveProjectPatch: (index: number, patch: Partial<ProjectItem>) => Promise<boolean>;
+  onPersistProjects: (items: ProjectItem[]) => Promise<boolean>;
   target: WritingTarget;
 }) {
   function update(i: number, patch: Partial<ProjectItem>) {
@@ -42,7 +44,7 @@ export function ProjectsSection({
             <AddProjectMenu
               target={target}
               onAddBlank={() => onChange([{ ...EMPTY_PROJECT }, ...items])}
-              onAddGenerated={(project) => onChange([project, ...items])}
+              onAddGenerated={(project) => void onPersistProjects([project, ...items])}
             />
           </div>
         }

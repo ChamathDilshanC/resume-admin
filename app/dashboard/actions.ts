@@ -19,8 +19,8 @@ import {
   type TemplateSummary,
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
-import { generateProjectContent, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
-import type { WritingTarget } from "@/lib/types";
+import { generateProjectContent, suggestProjectEvidence, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
+import type { WritingTarget, ProjectEvidence } from "@/lib/types";
 import { researchSummary } from "@/lib/repository-context.cjs";
 import { listFolderFiles, uploadFileToFolder, renameFile, trashFile } from "@/lib/google-drive";
 import { getFreshAccessToken } from "@/lib/google-drive-oauth";
@@ -334,6 +334,24 @@ export async function generateProjectFromGithubRepo(
     return { ok: true, project };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+// Reads the repo + submodule READMEs and has the AI propose answers for the
+// evidence form. Suggestions are README-grounded only; the user reviews them.
+export async function autofillProjectEvidence(
+  repoName: string
+): Promise<
+  | { ok: true; suggestion: { role: string; technologies: string[]; evidence: Required<ProjectEvidence> } }
+  | { ok: false; error: string }
+> {
+  try {
+    const accessToken = await requireAccessToken();
+    const owner = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
+    const { context } = await fetchProjectTechStack(accessToken, owner, repoName);
+    return { ok: true, suggestion: await suggestProjectEvidence(context) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not auto-fill from this repository" };
   }
 }
 

@@ -1,5 +1,5 @@
 import policy from "./resume-writing-policy.json";
-import type { ProjectItem, WritingTarget } from "./types";
+import type { ProjectEvidence, ProjectItem, WritingTarget } from "./types";
 import type { RepositoryContext } from "./repository-context.cjs";
 
 const PROJECT_SYSTEM_PROMPT = `${policy.evidence}\n\n${policy.repository}\n\n${policy.project}`;
@@ -98,6 +98,38 @@ export async function generateProjectContent(
     throw new Error("Add the project's purpose and your actual contribution before generating a draft.");
   }
   return { description: parsed.description.trim(), highlights: parsed.highlights.map((h: string) => h.trim()) };
+}
+
+const EVIDENCE_SYSTEM_PROMPT = `You pre-fill a developer's CV evidence form for one GitHub project, using only the repository README text provided in repositoryContext.
+Return ONLY a JSON object with string fields: role, technologies, problem, contribution, result, aiUsage.
+Rules:
+- technologies: comma-separated tools/frameworks/languages that the READMEs explicitly state or clearly show the project uses. Never invent any.
+- problem: one or two sentences on who needed this system and why, taken from the READMEs.
+- contribution: what the READMEs state about how the system is built (architecture, main components, technical decisions). Describe the project's implementation, not claims about a specific person.
+- role: leave "" unless the READMEs name the owner's role.
+- result: leave "" unless the READMEs state a measured outcome or a delivered capability. Never invent numbers.
+- aiUsage: leave "" unless the READMEs describe AI use.
+- Use "" for anything the READMEs do not support. Be concise and factual. The developer will review and edit everything.`;
+
+export async function suggestProjectEvidence(
+  repositoryContext: RepositoryContext
+): Promise<{ role: string; technologies: string[]; evidence: Required<ProjectEvidence> }> {
+  const raw = await callGeminiWithFallback(EVIDENCE_SYSTEM_PROMPT, JSON.stringify({ repositoryContext }));
+  const parsed = parseJson(raw);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("AI returned an invalid suggestion. Please try again.");
+  }
+  const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  return {
+    role: text(parsed.role),
+    technologies: text(parsed.technologies).split(",").map((t) => t.trim()).filter(Boolean),
+    evidence: {
+      problem: text(parsed.problem),
+      contribution: text(parsed.contribution),
+      result: text(parsed.result),
+      aiUsage: text(parsed.aiUsage),
+    },
+  };
 }
 
 const SUMMARY_SYSTEM_PROMPT = `${policy.evidence}\n\n${policy.summary}`;

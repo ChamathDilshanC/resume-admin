@@ -16,7 +16,7 @@ import type { ProjectItem, WritingTarget } from "@/lib/types";
 import { ProjectEvidenceFields } from "./ProjectEvidenceFields";
 import { RepositorySources } from "./RepositorySources";
 import type { RepoSummary } from "@/lib/github";
-import { listGithubRepos, generateProjectFromGithubRepo } from "../actions";
+import { listGithubRepos, generateProjectFromGithubRepo, autofillProjectEvidence } from "../actions";
 
 type Step = "picker" | "evidence" | "generating" | "review";
 type VisibilityFilter = "all" | "public" | "private";
@@ -39,6 +39,7 @@ export function AddProjectMenu({
   const [draft, setDraft] = useState<ProjectItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<RepoSummary | null>(null);
+  const [autofilling, setAutofilling] = useState(false);
   const [notes, setNotes] = useState<Pick<ProjectItem, "role" | "technologies" | "evidence">>({});
 
   function reset() {
@@ -49,6 +50,7 @@ export function AddProjectMenu({
     setVisibility("all");
     setSelectedRepo(null);
     setNotes({});
+    setAutofilling(false);
   }
 
   async function openImportDialog() {
@@ -69,6 +71,36 @@ export function AddProjectMenu({
     setNotes({});
     setError(null);
     setStep("evidence");
+  }
+
+  // Fills only fields the user left empty, so typed notes are never overwritten.
+  async function handleAutofill() {
+    if (!selectedRepo) return;
+    setAutofilling(true);
+    setError(null);
+    try {
+      const result = await autofillProjectEvidence(selectedRepo.name);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const { role, technologies, evidence } = result.suggestion;
+      setNotes((current) => ({
+        role: current.role?.trim() ? current.role : role,
+        technologies: current.technologies?.some((t) => t.trim()) ? current.technologies : technologies,
+        evidence: {
+          problem: current.evidence?.problem?.trim() ? current.evidence.problem : evidence.problem,
+          contribution: current.evidence?.contribution?.trim() ? current.evidence.contribution : evidence.contribution,
+          result: current.evidence?.result?.trim() ? current.evidence.result : evidence.result,
+          aiUsage: current.evidence?.aiUsage?.trim() ? current.evidence.aiUsage : evidence.aiUsage,
+        },
+      }));
+      gooeyToast.success("Auto-filled from README", { description: "Review and edit every field before generating." });
+    } catch {
+      setError("Could not reach the AI service. Please try again.");
+    } finally {
+      setAutofilling(false);
+    }
   }
 
   async function handleGenerate() {
@@ -199,8 +231,11 @@ export function AddProjectMenu({
               <ProjectEvidenceFields project={notes} onChange={(patch) => setNotes({ ...notes, ...patch })} />
               {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
               <div className="flex justify-end gap-2">
-                <Button variant="secondary" onClick={() => setStep("picker")}>Back</Button>
-                <Button onClick={handleGenerate}>Generate draft</Button>
+                <Button variant="secondary" onClick={() => setStep("picker")} disabled={autofilling}>Back</Button>
+                <Button variant="secondary" onClick={handleAutofill} disabled={autofilling}>
+                  {autofilling ? "Reading READMEs..." : "Auto-fill from repo"}
+                </Button>
+                <Button onClick={handleGenerate} disabled={autofilling}>Generate draft</Button>
               </div>
             </div>
           )}
