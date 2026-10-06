@@ -33,6 +33,13 @@ Handlebars.registerHelper("joinList", function (list: unknown) {
   return list.join(", ");
 });
 
+// Keep in sync with "techList" in resume-core/generate-pdf.js.
+Handlebars.registerHelper("techList", function (list: unknown) {
+  if (!Array.isArray(list)) return "";
+  const items = list.map((item) => String(item).trim()).filter(Boolean);
+  return items.length > 10 ? `${items.slice(0, 10).join(", ")}, etc.` : items.join(", ");
+});
+
 Handlebars.registerHelper("dateRange", function (startDate: unknown, endDate: unknown) {
   const start = formatDateString(startDate);
   const end = formatDateString(endDate);

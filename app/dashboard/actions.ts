@@ -370,7 +370,11 @@ export async function generateProjectFromGithubRepo(
       endDate,
       repositoryType: "MAIN",
       role: evidenceNotes.role,
-      technologies: [...new Set([...techStack.split(","), ...(evidenceNotes.technologies || [])].map((t) => t.trim()).filter(Boolean))],
+      // Explicit/AI-suggested tools first, GitHub languages after (noisy ones like
+      // HTML or Dockerfile then fall past the 10 the CV prints). Case-insensitive dedupe.
+      technologies: [...(evidenceNotes.technologies || []), ...techStack.split(",")]
+        .map((t) => t.trim())
+        .filter((t, i, all) => t && all.findIndex((o) => o.toLowerCase() === t.toLowerCase()) === i),
       evidence: evidenceNotes.evidence,
       repositoryResearch: researchSummary(context),
     };

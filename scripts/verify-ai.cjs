@@ -20,7 +20,7 @@ function load(relative, mocks = {}) {
   }).outputText;
   const exports = {};
   const localRequire = createRequire(filename);
-  vm.runInNewContext(code, { exports, console, Buffer, fetch: fakeFetch,
+  vm.runInNewContext(code, { exports, console, Buffer, fetch: fakeFetch, AbortSignal,
     process: { env: { AI_API_KEY: "offline-test-key", ALLOWED_GITHUB_USERNAME: "candidate" } },
     require: (id) => Object.hasOwn(mocks, id) ? mocks[id] : localRequire(id),
   }, { filename });
