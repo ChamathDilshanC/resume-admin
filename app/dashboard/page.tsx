@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { fetchResumeJson } from "@/lib/github";
 import { ResumeEditor } from "./ResumeEditor";
 
+// Server actions (repo import, AI drafts) run under this route's time limit.
+export const maxDuration = 60;
+
 interface SessionWithToken {
   accessToken?: string;
 }

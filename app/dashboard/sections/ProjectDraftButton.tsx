@@ -8,7 +8,7 @@ import type { ProjectItem, WritingTarget } from "@/lib/types";
 import { draftProjectAction } from "../actions";
 import { RepositorySources } from "./RepositorySources";
 
-type Draft = Pick<ProjectItem, "description" | "highlights" | "repositoryResearch">;
+type Draft = Pick<ProjectItem, "description" | "highlights" | "repositoryResearch" | "startDate" | "endDate">;
 
 export function ProjectDraftButton({ project, target, onApply }: {
   project: ProjectItem;

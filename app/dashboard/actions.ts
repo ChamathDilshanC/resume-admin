@@ -19,8 +19,8 @@ import {
   type TemplateSummary,
 } from "@/lib/github";
 import { renderTemplatePreview } from "@/lib/preview";
-import { generateProjectContent, suggestProjectEvidence, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
-import type { WritingTarget, ProjectEvidence } from "@/lib/types";
+import { generateProjectContent, optimizeSummaryForAts, optimizeWorkHighlightsForAts } from "@/lib/ai";
+import type { WritingTarget } from "@/lib/types";
 import { researchSummary } from "@/lib/repository-context.cjs";
 import { listFolderFiles, uploadFileToFolder, renameFile, trashFile } from "@/lib/google-drive";
 import { getFreshAccessToken } from "@/lib/google-drive-oauth";
@@ -310,7 +310,7 @@ export async function generateProjectFromGithubRepo(
     const accessToken = await requireAccessToken();
     const owner = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
 
-    const { name, description, url, techStack, repoFullName, context } = await fetchProjectTechStack(
+    const { name, description, url, techStack, repoFullName, startDate, endDate, context } = await fetchProjectTechStack(
       accessToken,
       owner,
       repoName
@@ -322,6 +322,8 @@ export async function generateProjectFromGithubRepo(
       highlights: [],
       links: [{ label: name, url }],
       repoFullName,
+      startDate,
+      endDate,
       repositoryType: "MAIN",
       role: notes.role,
       technologies: [...new Set([...techStack.split(","), ...(notes.technologies || [])].map((t) => t.trim()).filter(Boolean))],
@@ -337,28 +339,10 @@ export async function generateProjectFromGithubRepo(
   }
 }
 
-// Reads the repo + submodule READMEs and has the AI propose answers for the
-// evidence form. Suggestions are README-grounded only; the user reviews them.
-export async function autofillProjectEvidence(
-  repoName: string
-): Promise<
-  | { ok: true; suggestion: { role: string; technologies: string[]; evidence: Required<ProjectEvidence> } }
-  | { ok: false; error: string }
-> {
-  try {
-    const accessToken = await requireAccessToken();
-    const owner = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
-    const { context } = await fetchProjectTechStack(accessToken, owner, repoName);
-    return { ok: true, suggestion: await suggestProjectEvidence(context) };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Could not auto-fill from this repository" };
-  }
-}
-
 export async function draftProjectAction(
   project: ProjectItem,
   target: WritingTarget = {}
-): Promise<{ ok: true; draft: Pick<ProjectItem, "description" | "highlights" | "repositoryResearch"> } | { ok: false; error: string }> {
+): Promise<{ ok: true; draft: Pick<ProjectItem, "description" | "highlights" | "repositoryResearch" | "startDate" | "endDate"> } | { ok: false; error: string }> {
   try {
     const accessToken = await requireAccessToken();
     // Existing/manual projects can already have a GitHub link but no stored repo identity.
@@ -366,13 +350,19 @@ export async function draftProjectAction(
       .map((link) => link.url.match(/^https:\/\/github\.com\/([A-Za-z0-9-]+\/[A-Za-z0-9_.-]+)\/?(?:[?#].*)?$/i)?.[1])
       .find(Boolean)?.replace(/\.git$/i, "");
     let context;
+    let dates: Pick<ProjectItem, "startDate" | "endDate"> = {};
     if (linkedRepo) {
       const parts = linkedRepo.split("/");
       if (parts.length !== 2) throw new Error("Use an owner/repository GitHub identity for this project.");
-      context = (await fetchProjectTechStack(accessToken, parts[0], parts[1])).context;
+      const fetched = await fetchProjectTechStack(accessToken, parts[0], parts[1]);
+      context = fetched.context;
+      // Only fill dates the user left empty.
+      if (!project.startDate && fetched.startDate) dates.startDate = fetched.startDate;
+      if (!project.endDate && fetched.endDate) dates.endDate = fetched.endDate;
     }
     return { ok: true, draft: { ...await generateProjectContent(project, target, context),
       repositoryResearch: context ? researchSummary(context) : undefined,
+      ...dates,
     } };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not draft project content" };

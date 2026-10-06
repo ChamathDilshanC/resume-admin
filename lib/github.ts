@@ -254,14 +254,26 @@ export async function fetchProjectTechStack(
   accessToken: string,
   owner: string,
   repo: string
-): Promise<{ name: string; description: string; url: string; techStack: string; repoFullName: string; context: RepositoryContext }> {
+): Promise<{ name: string; description: string; url: string; techStack: string; repoFullName: string; startDate?: string; endDate?: string; context: RepositoryContext }> {
   const context = await collectRepositoryContext({ owner, repo, token: accessToken });
+  // Repo creation / last push as the project's start / end (YYYY-MM). Best effort.
+  let startDate: string | undefined;
+  let endDate: string | undefined;
+  try {
+    const { data } = await client(accessToken).repos.get({ owner, repo });
+    startDate = data.created_at?.slice(0, 7) || undefined;
+    endDate = data.pushed_at?.slice(0, 7) || undefined;
+  } catch {
+    // Dates are optional; leave them for the user to fill in.
+  }
   return {
     name: context.root.name,
     description: context.root.description,
     url: context.root.url,
     techStack: [...new Set(context.repositories.flatMap((r) => r.languages))].join(", "),
     repoFullName: context.root.fullName,
+    startDate,
+    endDate,
     context,
   };
 }

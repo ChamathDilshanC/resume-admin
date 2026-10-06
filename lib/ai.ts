@@ -40,6 +40,8 @@ function getApiKeys(): string[] {
     .filter(Boolean);
 }
 
+const TOTAL_AI_BUDGET_MS = 40_000;
+
 async function callGeminiWithFallback(systemPrompt: string, userPrompt: string): Promise<string> {
   const apiKeys = getApiKeys();
   if (apiKeys.length === 0) {
@@ -51,11 +53,17 @@ async function callGeminiWithFallback(systemPrompt: string, userPrompt: string):
     ? [configuredModel, ...GEMINI_MODEL_FALLBACKS.filter((model) => model !== configuredModel)]
     : GEMINI_MODEL_FALLBACKS;
 
+  // Overall budget so a busy/rate-limited AI service surfaces as an error the
+  // user can retry, instead of the UI spinning past the host's time limit.
+  const deadline = Date.now() + TOTAL_AI_BUDGET_MS;
   let lastError: unknown;
   for (const model of models) {
     for (const apiKey of apiKeys) {
+      if (Date.now() >= deadline) {
+        throw new Error("The AI service is busy or rate-limited right now. Wait a minute and try again.");
+      }
       try {
-        return await callGemini(systemPrompt, userPrompt, model, apiKey);
+        return await callGemini(systemPrompt, userPrompt, model, apiKey, Math.min(20_000, deadline - Date.now()));
       } catch (error) {
         lastError = error;
         if (!(error instanceof AIRequestError) || !isRetryableStatus(error.status)) {
@@ -184,10 +192,13 @@ export async function optimizeWorkHighlightsForAts(params: {
   return highlights;
 }
 
-async function callGemini(systemPrompt: string, userPrompt: string, model: string, apiKey: string): Promise<string> {
+async function callGemini(systemPrompt: string, userPrompt: string, model: string, apiKey: string, timeoutMs = 20_000): Promise<string> {
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+  // A hung Gemini call must not eat the host's whole function time limit:
+  // treat a timeout like an overload so the next key/model is tried.
   const response = await fetch(apiUrl, {
+    signal: AbortSignal.timeout(timeoutMs),
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -195,6 +206,8 @@ async function callGemini(systemPrompt: string, userPrompt: string, model: strin
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
       generationConfig: { temperature: 0.3 },
     }),
+  }).catch(() => {
+    throw new AIRequestError("AI API request timed out or could not connect.", 503);
   });
 
   if (!response.ok) {

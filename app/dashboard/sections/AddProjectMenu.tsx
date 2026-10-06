@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { gooeyToast } from "goey-toast";
 import {
@@ -12,12 +12,17 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button, Field, StringListEditor } from "@/components/FormControls";
 import { PlusIcon, GithubIcon, SparklesIcon } from "@/components/icons";
-import type { ProjectItem, WritingTarget } from "@/lib/types";
+import type { ProjectEvidence, ProjectItem, WritingTarget } from "@/lib/types";
 import { ProjectEvidenceFields } from "./ProjectEvidenceFields";
 import { RepositorySources } from "./RepositorySources";
 import type { RepoSummary } from "@/lib/github";
-import { listGithubRepos, generateProjectFromGithubRepo, autofillProjectEvidence } from "../actions";
+import { listGithubRepos, generateProjectFromGithubRepo } from "../actions";
 
+type AutofillSuggestion = {
+  role: string;
+  technologies: string[];
+  evidence: Required<ProjectEvidence>;
+};
 type Step = "picker" | "evidence" | "generating" | "review";
 type VisibilityFilter = "all" | "public" | "private";
 
@@ -40,7 +45,18 @@ export function AddProjectMenu({
   const [error, setError] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<RepoSummary | null>(null);
   const [autofilling, setAutofilling] = useState(false);
+  // The bar jumps to a stage's floor when the server reports that stage, then
+  // eases toward (never reaching) the ceiling until the next stage arrives.
+  const [progress, setProgress] = useState({ pct: 0, ceiling: 0, label: "" });
   const [notes, setNotes] = useState<Pick<ProjectItem, "role" | "technologies" | "evidence">>({});
+
+  useEffect(() => {
+    if (!autofilling) return;
+    const timer = setInterval(() => {
+      setProgress((p) => (p.pct >= p.ceiling ? p : { ...p, pct: p.pct + (p.ceiling - p.pct) * 0.05 }));
+    }, 200);
+    return () => clearInterval(timer);
+  }, [autofilling]);
 
   function reset() {
     setStep("picker");
@@ -51,6 +67,7 @@ export function AddProjectMenu({
     setSelectedRepo(null);
     setNotes({});
     setAutofilling(false);
+    setProgress({ pct: 0, ceiling: 0, label: "" });
   }
 
   async function openImportDialog() {
@@ -78,13 +95,41 @@ export function AddProjectMenu({
     if (!selectedRepo) return;
     setAutofilling(true);
     setError(null);
+    setProgress({ pct: 3, ceiling: 8, label: "Connecting to GitHub..." });
     try {
-      const result = await autofillProjectEvidence(selectedRepo.name);
-      if (!result.ok) {
-        setError(result.error);
+      const response = await fetch("/api/autofill", {
+        signal: AbortSignal.timeout(75_000),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoName: selectedRepo.name }),
+      });
+      if (!response.ok || !response.body) throw new Error("request failed");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let suggestion: AutofillSuggestion | null = null;
+      let failure: string | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+          if (event.stage === "readme") setProgress({ pct: 10, ceiling: 55, label: "Reading repository and submodule READMEs..." });
+          else if (event.stage === "ai") setProgress({ pct: 58, ceiling: 95, label: "AI is analysing the READMEs..." });
+          else if (event.done) suggestion = event.suggestion;
+          else if (event.error) failure = event.error;
+        }
+      }
+      if (failure || !suggestion) {
+        setError(failure || "Auto-fill ended without a result. Please try again.");
         return;
       }
-      const { role, technologies, evidence } = result.suggestion;
+      setProgress({ pct: 100, ceiling: 100, label: "Done" });
+      const { role, technologies, evidence } = suggestion;
       setNotes((current) => ({
         role: current.role?.trim() ? current.role : role,
         technologies: current.technologies?.some((t) => t.trim()) ? current.technologies : technologies,
@@ -97,7 +142,7 @@ export function AddProjectMenu({
       }));
       gooeyToast.success("Auto-filled from README", { description: "Review and edit every field before generating." });
     } catch {
-      setError("Could not reach the AI service. Please try again.");
+      setError("Auto-fill timed out or could not reach the AI service. Your notes are still here; please try again.");
     } finally {
       setAutofilling(false);
     }
@@ -230,8 +275,23 @@ export function AddProjectMenu({
               <p className="text-sm text-gray-500">{selectedRepo.description || "Add the project purpose below."} We read this repository and its submodule READMEs for project details and technical terminology. Add your personal contribution and confirmed results below.</p>
               <ProjectEvidenceFields project={notes} onChange={(patch) => setNotes({ ...notes, ...patch })} />
               {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-              <div className="flex justify-end gap-2">
+              <div className="flex items-center gap-3">
                 <Button variant="secondary" onClick={() => setStep("picker")} disabled={autofilling}>Back</Button>
+                <div className="min-w-0 flex-1" aria-live="polite">
+                  {autofilling && (
+                    <>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-full rounded-full bg-brand transition-[width] duration-300 ease-out"
+                          style={{ width: `${Math.round(progress.pct)}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 truncate text-xs text-gray-500">
+                        {progress.label} {Math.round(progress.pct)}%
+                      </p>
+                    </>
+                  )}
+                </div>
                 <Button variant="secondary" onClick={handleAutofill} disabled={autofilling}>
                   {autofilling ? "Reading READMEs..." : "Auto-fill from repo"}
                 </Button>
