@@ -52,27 +52,57 @@ function getServiceAccountDriveClient(): drive_v3.Drive {
  * used so this endpoint never needs to receive or return a user's OAuth token.
  */
 export async function downloadResumePdf(fileId: string): Promise<DrivePdf> {
-  const drive = getServiceAccountDriveClient();
-  const metadata = await drive.files.get({
-    fileId,
-    fields: "id,name,mimeType,modifiedTime,trashed",
-  });
-  const file = metadata.data;
-  if (!file.id || !file.name || file.trashed || file.mimeType !== "application/pdf") {
-    throw new Error("Configured resume Drive file is unavailable or is not a PDF.");
-  }
+  try {
+    const response = await fetch(
+      `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileId)}&export=download&confirm=t`,
+      { cache: "no-store", redirect: "follow" }
+    );
+    if (!response.ok) {
+      throw new Error(`Public Drive download returned ${response.status}.`);
+    }
 
-  const media = await drive.files.get(
-    { fileId, alt: "media" },
-    { responseType: "arraybuffer" }
-  );
-  const data = media.data as ArrayBuffer | Buffer;
-  return {
-    buffer: Buffer.isBuffer(data) ? data : Buffer.from(data),
-    name: file.name,
-    mimeType: file.mimeType,
-    modifiedTime: file.modifiedTime ?? undefined,
-  };
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length === 0 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+      throw new Error("Public Drive download did not return a PDF.");
+    }
+
+    return {
+      buffer,
+      name: "Chamath_Dilshan_Resume.pdf",
+      mimeType: "application/pdf",
+      modifiedTime: response.headers.get("last-modified") ?? undefined,
+    };
+  } catch (publicDownloadError) {
+    try {
+      const drive = getServiceAccountDriveClient();
+      const metadata = await drive.files.get({
+        fileId,
+        fields: "id,name,mimeType,modifiedTime,trashed",
+      });
+      const file = metadata.data;
+      if (!file.id || !file.name || file.trashed || file.mimeType !== "application/pdf") {
+        throw new Error("Configured resume Drive file is unavailable or is not a PDF.");
+      }
+
+      const media = await drive.files.get(
+        { fileId, alt: "media" },
+        { responseType: "arraybuffer" }
+      );
+      const data = media.data as ArrayBuffer | Buffer;
+      return {
+        buffer: Buffer.isBuffer(data) ? data : Buffer.from(data),
+        name: file.name,
+        mimeType: file.mimeType,
+        modifiedTime: file.modifiedTime ?? undefined,
+      };
+    } catch (serviceAccountError) {
+      throw new Error(
+        `${publicDownloadError instanceof Error ? publicDownloadError.message : "Public Drive download failed."} ${
+          serviceAccountError instanceof Error ? serviceAccountError.message : "Service-account download failed."
+        }`
+      );
+    }
+  }
 }
 
 // User-OAuth client: the only one that can create new file *content*. A

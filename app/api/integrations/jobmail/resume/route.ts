@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
     });
     if (modifiedTime) headers.set("Last-Modified", new Date(modifiedTime).toUTCString());
     return new NextResponse(buffer as unknown as BodyInit, { headers });
-  } catch {
-    return NextResponse.json({ error: "Resume PDF unavailable" }, { status: 404 });
+  } catch (error) {
+    console.error("DevResume PDF retrieval failed:", error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: "Resume PDF unavailable" }, { status: 502 });
   }
 }
