@@ -52,6 +52,20 @@ Handlebars.registerHelper("stripProtocol", function (url: unknown) {
   return String(url || "").replace(/^https?:\/\//i, "").replace(/\/$/, "");
 });
 
+const ATS_TEXT_CORRECTIONS: Record<string, string> = {
+  Teraform: "Terraform",
+  Superbase: "Supabase",
+  projekts: "projects",
+};
+
+Handlebars.registerHelper("atsText", function (value: unknown) {
+  let text = String(value || "");
+  for (const [incorrect, corrected] of Object.entries(ATS_TEXT_CORRECTIONS)) {
+    text = text.replace(new RegExp(`\\b${incorrect}\\b`, "gi"), corrected);
+  }
+  return text;
+});
+
 // ATS wants "City, Country" spelled out, but resume.json stores ISO codes.
 const COUNTRY_NAMES: Record<string, string> = {
   LK: "Sri Lanka",
@@ -98,7 +112,21 @@ export function renderTemplatePreview(
   data: ResumeData
 ): string {
   const template = Handlebars.compile(templateHtml);
-  return template({ ...data, projects: data.projects?.filter((project) => project.includeInResume !== false) }).replace(
+  const includedProjects = data.projects?.filter((project) => project.includeInResume !== false) || [];
+  const isSignalAts = templateHtml.includes('class="signal-ats"');
+  const optimizedData = isSignalAts
+    ? {
+        ...data,
+        projects: includedProjects.slice(0, 3).map((project) => ({
+          ...project,
+          description: "",
+          highlights: (project.highlights || []).slice(0, 2),
+          technologies: (project.technologies || []).slice(0, 10),
+        })),
+        references: [],
+      }
+    : { ...data, projects: includedProjects };
+  return template(optimizedData).replace(
     /<!--\s*INLINE_STYLES\s*-->/,
     () => `<style>${stylesCss}</style>`
   );
