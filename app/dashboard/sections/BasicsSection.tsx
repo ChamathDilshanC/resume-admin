@@ -63,6 +63,18 @@ export function BasicsSection({
               />
               Show profile image in resume
             </label>
+            <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={basics.includeBrandIcon ?? false}
+                onChange={(e) => set("includeBrandIcon", e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-2 focus:ring-brand/15"
+              />
+              Show black brand icon in resume header
+            </label>
+            <p className="mt-1.5 text-xs text-gray-400">
+              Adds your logo as a small header mark. It is optional and works across every resume template.
+            </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Name" value={basics.name} onChange={(v) => set("name", v)} />
