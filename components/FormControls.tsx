@@ -9,19 +9,26 @@ export function Field({
   value,
   onChange,
   placeholder,
+  required = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  required?: boolean;
 }) {
   return (
     <label className="block text-sm">
-      <span className="mb-1.5 block font-medium text-gray-600">{label}</span>
+      <span className="mb-1.5 block font-medium text-gray-600">
+        {label}
+        {required && <span className="ml-1 text-red-500" aria-label="required">*</span>}
+      </span>
       <input
         type="text"
         value={value}
         placeholder={placeholder}
+        required={required}
+        aria-required={required}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition-all duration-150 placeholder:text-gray-400 focus:border-brand focus:ring-2 focus:ring-brand/15"
       />
