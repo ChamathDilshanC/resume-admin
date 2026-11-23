@@ -52,17 +52,11 @@ export function NavFooter() {
         {driveFileId && (
           <SidebarMenuItem>
             <SidebarMenuButton
-              render={
-                <a
-                  href={`https://drive.google.com/file/d/${driveFileId}/view`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                />
-              }
-              tooltip="View the live PDF on Google Drive"
+              render={<Link href="/dashboard/resume" target="_blank" rel="noreferrer" />}
+              tooltip="Open the resume in the branded browser viewer"
             >
               <HardDrive className="opacity-80" />
-              <span>Resume PDF</span>
+              <span>Resume PDF viewer</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         )}
