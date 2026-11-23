@@ -8,8 +8,13 @@ import { Providers } from "./providers";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Resume Admin",
+  title: "CHAMATH DILSHAN - Resume",
   description: "Private editor for resume.json",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
