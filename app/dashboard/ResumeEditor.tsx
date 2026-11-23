@@ -196,6 +196,15 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
     options: { regeneratePdf?: boolean; silent?: boolean } = {}
   ): Promise<boolean> {
     const { regeneratePdf = true, silent = false } = options;
+    if (!nextData.basics.label.trim()) {
+      setSaveState("error");
+      if (!silent) {
+        gooeyToast.error("Target role / headline is required", {
+          description: "Enter a target role or headline before saving.",
+        });
+      }
+      return false;
+    }
     saving.current = true;
     setSaveState("saving");
     try {

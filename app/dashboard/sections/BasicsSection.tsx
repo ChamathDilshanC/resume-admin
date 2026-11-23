@@ -54,10 +54,25 @@ export function BasicsSection({
           <CardLabel>Identity</CardLabel>
           <div className="mb-4">
             <PhotoUploader image={basics.image} onChange={(v) => set("image", v)} />
+            <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={basics.includeProfileImage ?? false}
+                onChange={(e) => set("includeProfileImage", e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-2 focus:ring-brand/15"
+              />
+              Show profile image in resume
+            </label>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Name" value={basics.name} onChange={(v) => set("name", v)} />
-            <Field label="Target role / headline" value={basics.label} onChange={(v) => set("label", v)} />
+            <Field
+              label="Target role / headline"
+              value={basics.label}
+              onChange={(v) => set("label", v)}
+              placeholder="e.g. Software Engineer"
+              required
+            />
           </div>
         </Card>
 
@@ -78,35 +93,6 @@ export function BasicsSection({
               onChange={(v) => set("location", { ...basics.location, countryCode: v })}
             />
           </div>
-        </Card>
-      </div>
-
-      <div className="mt-4">
-        <Card>
-          <CardLabel>Tailor to the role</CardLabel>
-          <TextArea label="Job description (optional; not printed in your CV)" value={basics.jobDescription || ""}
-            onChange={(v) => set("jobDescription", v)} rows={5} />
-          <p className="mt-2 text-xs text-gray-500">AI prioritizes relevant evidence from your work and projects. A job requirement does not become a claimed skill.</p>
-          <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={basics.includeReferences ?? false}
-              onChange={(e) => set("includeReferences", e.target.checked)} />
-            Include references in Clarity (ATS), when requested by the employer
-          </label>
-        </Card>
-      </div>
-
-      <div className="mt-4">
-        <Card>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <CardLabel>Summary</CardLabel>
-            <Button variant="secondary" onClick={handleAiOptimizeSummary} disabled={optimizing}>
-              <span className="inline-flex items-center gap-1.5">
-                <SparklesIcon className="h-3.5 w-3.5" />
-                {optimizing ? "Optimizing…" : "AI Optimize (ATS)"}
-              </span>
-            </Button>
-          </div>
-          <TextArea label="" value={basics.summary} onChange={(v) => set("summary", v)} rows={4} />
         </Card>
       </div>
 
@@ -137,6 +123,35 @@ export function BasicsSection({
               </p>
             </div>
           )}
+        </Card>
+      </div>
+
+      <div className="mt-4">
+        <Card>
+          <CardLabel>Tailor to the role</CardLabel>
+          <TextArea label="Job description (optional; not printed in your CV)" value={basics.jobDescription || ""}
+            onChange={(v) => set("jobDescription", v)} rows={5} />
+          <p className="mt-2 text-xs text-gray-500">AI prioritizes relevant evidence from your work and projects. A job requirement does not become a claimed skill.</p>
+          <label className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" checked={basics.includeReferences ?? false}
+              onChange={(e) => set("includeReferences", e.target.checked)} />
+            Include references in Clarity (ATS), when requested by the employer
+          </label>
+        </Card>
+      </div>
+
+      <div className="mt-4">
+        <Card>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <CardLabel>Summary</CardLabel>
+            <Button variant="secondary" onClick={handleAiOptimizeSummary} disabled={optimizing}>
+              <span className="inline-flex items-center gap-1.5">
+                <SparklesIcon className="h-3.5 w-3.5" />
+                {optimizing ? "Optimizing…" : "AI Optimize (ATS)"}
+              </span>
+            </Button>
+          </div>
+          <TextArea label="" value={basics.summary} onChange={(v) => set("summary", v)} rows={4} />
         </Card>
       </div>
 

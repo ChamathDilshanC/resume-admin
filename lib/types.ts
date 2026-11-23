@@ -18,6 +18,7 @@ export interface ResumeBasics {
   profiles: { network: string; username: string; url: string }[];
   targetCompany?: string;
   hideDeclaration?: boolean;
+  includeProfileImage?: boolean;
   /** Used to prioritize supported evidence in AI drafts; never printed. */
   jobDescription?: string;
   includeReferences?: boolean;

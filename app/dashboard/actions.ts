@@ -154,6 +154,9 @@ export async function saveResume(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { regeneratePdf = true } = options;
   try {
+    if (!data.basics.label.trim()) {
+      return { ok: false, error: "Target role / headline is required." };
+    }
     const accessToken = await requireAccessToken();
     const { data: remote, sha } = await fetchResumeJson(accessToken);
 
