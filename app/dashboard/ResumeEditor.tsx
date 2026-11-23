@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { gooeyToast } from "goey-toast";
 import type { ResumeData, ProjectItem } from "@/lib/types";
 import { Button } from "@/components/FormControls";
@@ -339,6 +340,14 @@ export function ResumeEditor({ initialData }: { initialData: ResumeData }) {
                 "Regenerate PDF"
               )}
             </Button>
+            <Link
+              href="/dashboard/resume"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 sm:inline-flex"
+            >
+              View Resume
+            </Link>
           </div>
         </header>
 
