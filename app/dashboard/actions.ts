@@ -33,6 +33,7 @@ interface SessionWithToken {
 }
 
 const GOOGLE_DRIVE_COOKIE = "google_drive_refresh_token";
+const BRAND_ICON_ASSET_PATH = "assets/brand-icon-black.png";
 
 async function requireAccessToken(): Promise<string> {
   const session = await getServerSession(authOptions);
@@ -245,6 +246,16 @@ export async function previewTemplateAction(
       } catch {
         previewData.basics.image = "";
       }
+    }
+    if (previewData.basics.includeBrandIcon) {
+      try {
+        const { buffer, contentType } = await fetchAsset(accessToken, BRAND_ICON_ASSET_PATH);
+        previewData.basics.brandIcon = `data:${contentType};base64,${buffer.toString("base64")}`;
+      } catch {
+        previewData.basics.brandIcon = "";
+      }
+    } else {
+      previewData.basics.brandIcon = "";
     }
 
     const html = renderTemplatePreview(templateHtml, stylesCss, previewData);

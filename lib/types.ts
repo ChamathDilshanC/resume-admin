@@ -19,6 +19,9 @@ export interface ResumeBasics {
   targetCompany?: string;
   hideDeclaration?: boolean;
   includeProfileImage?: boolean;
+  includeBrandIcon?: boolean;
+  /** Runtime-only data URI injected for preview/PDF rendering; not saved to resume.json. */
+  brandIcon?: string;
   /** Used to prioritize supported evidence in AI drafts; never printed. */
   jobDescription?: string;
   includeReferences?: boolean;
