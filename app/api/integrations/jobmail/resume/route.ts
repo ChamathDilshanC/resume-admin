@@ -29,6 +29,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const accountId =
+    new URL(request.url).searchParams.get("accountId") ||
+    request.headers.get("x-jobmail-account-id");
+  const allowedAccountId = process.env.ALLOWED_GITHUB_USERNAME || "ChamathDilshanC";
+  if (accountId !== allowedAccountId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const fileId = process.env.GDRIVE_FILE_ID;
   if (!fileId) {
     return NextResponse.json({ error: "Resume file is not configured" }, { status: 503 });
