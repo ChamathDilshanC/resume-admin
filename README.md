@@ -29,6 +29,23 @@ API using your own OAuth session, and PDF rendering reuses the
 `generate-pdf.js` script and `regenerate-pdf.yml` workflow already in
 `resume-core`.
 
+## JobMail tailored-CV bridge
+
+JobMail can connect to this dashboard and request a one-off CV tailored to the
+current application. Its **Generate DevResume CV** button sends the target role,
+company, and optional job description to the protected
+`/api/integrations/jobmail/resume/generate` route. The route dispatches
+`resume-core`'s `generate-jobmail-resume.yml`, polls the run, downloads the
+short-lived PDF artifact, validates it, and returns it to JobMail for the
+current email.
+
+The tailored workflow renders a temporary copy of the private resume data. It
+does not commit role-specific fields to `resume-data` or replace the canonical
+Google Drive PDF. JobMail receives only the validated PDF bytes and request
+status; browser code never receives the GitHub token or integration secret.
+See [`docs/jobmail-tailored-cv.md`](docs/jobmail-tailored-cv.md) for the
+endpoint contract, setup, and security boundaries.
+
 ## Features
 
 **Editing surface**
@@ -205,10 +222,11 @@ Copy `.env.example` to `.env.local` (for local dev) and fill in:
 - `NEXTAUTH_SECRET` — generate with `openssl rand -base64 32`
 - `NEXTAUTH_URL` — `http://localhost:3000` locally, your real deployed URL in production
 - `ALLOWED_GITHUB_USERNAME` — defaults to `ChamathDilshanC`
-- `JOBMAIL_INTEGRATION_SECRET` — a server-only secret required by
-  `GET /api/integrations/jobmail/resume`; JobMail should send it as
-  the configured value in its authentication header. The endpoint is scoped to the stable
-  `GDRIVE_FILE_ID` PDF and returns its bytes with a `Last-Modified` header.
+- `JOBMAIL_INTEGRATION_SECRET` — a server-only secret required by the JobMail
+  latest-resume and tailored-generation endpoints. JobMail sends it in the
+  server-to-server authentication header. Keep it identical in both services.
+- `ALLOWED_GITHUB_USERNAME` — the stable account identifier accepted by the
+  JobMail bridge (defaults to `ChamathDilshanC`).
 - `JOBMAIL_GITHUB_TOKEN` — a server-only fine-grained GitHub token used by
   the JobMail tailored-CV bridge to dispatch `generate-jobmail-resume.yml`
   and download its short-lived artifact. Grant only the minimum Actions and
