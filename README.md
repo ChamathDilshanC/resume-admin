@@ -209,6 +209,10 @@ Copy `.env.example` to `.env.local` (for local dev) and fill in:
   `GET /api/integrations/jobmail/resume`; JobMail should send it as
   the configured value in its authentication header. The endpoint is scoped to the stable
   `GDRIVE_FILE_ID` PDF and returns its bytes with a `Last-Modified` header.
+- `JOBMAIL_GITHUB_TOKEN` — a server-only fine-grained GitHub token used by
+  the JobMail tailored-CV bridge to dispatch `generate-jobmail-resume.yml`
+  and download its short-lived artifact. Grant only the minimum Actions and
+  contents access needed for `resume-core` and `resume-data`.
 - `RESUME_REPO_OWNER` / `RESUME_REPO_NAME` — the pipeline repo, defaults to
   `ChamathDilshanC/resume-core`
 - `RESUME_DATA_REPO_NAME` — the private repo `resume.json` itself lives in,
